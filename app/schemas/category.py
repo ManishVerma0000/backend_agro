@@ -7,6 +7,7 @@ class CategoryBase(BaseModel):
     priority: int
     status: str
     createdDate: str
+    imageUrl: Optional[str] = None
 
 class CategoryCreate(CategoryBase):
     pass
@@ -17,6 +18,7 @@ class CategoryUpdate(BaseModel):
     priority: Optional[int] = None
     status: Optional[str] = None
     createdDate: Optional[str] = None
+    imageUrl: Optional[str] = None
 
 class CategoryResponse(CategoryBase):
     id: str
