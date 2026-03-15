@@ -38,3 +38,7 @@ class TokenPayload(BaseModel):
 class LoginUser(BaseModel):
     username:str
     password:str
+
+
+class RegisterUser(BaseModel):
+    phone_number:int

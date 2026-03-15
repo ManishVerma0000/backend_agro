@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from typing import List
 
 from app.api.deps import get_current_user, get_current_active_user
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse,RegisterUser
+from app.services.user_service import register_user_to_db;
 
 router = APIRouter()
 
@@ -25,3 +26,16 @@ def read_users(
     Note: Full implementation requires fetching all users from DB. For now, returning the current user as an example.
     """
     return [current_user]
+
+
+
+@router.post('/register')
+async def register_user(request_body:RegisterUser):
+    try:
+        result=await register_user_to_db(request_body)
+        print(result,'result')
+        return  result
+    except Exception as e :
+        print('inside the error conditions',e)
+        return e
+    
