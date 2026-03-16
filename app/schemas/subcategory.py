@@ -8,7 +8,8 @@ class HsnCode(BaseModel):
 
 class SubcategoryBase(BaseModel):
     name: str
-    category: str
+    categoryId: Optional[str] = ""
+    category: Optional[str] = "" # for legacy data
     hsnCodesCount: int
     status: str
     createdDate: str
@@ -20,7 +21,7 @@ class SubcategoryCreate(SubcategoryBase):
 
 class SubcategoryUpdate(BaseModel):
     name: Optional[str] = None
-    category: Optional[str] = None
+    categoryId: Optional[str] = None
     hsnCodesCount: Optional[int] = None
     status: Optional[str] = None
     createdDate: Optional[str] = None
