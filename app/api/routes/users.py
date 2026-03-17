@@ -3,8 +3,8 @@ from pydantic import BaseModel
 from typing import List
 
 from app.api.deps import get_current_user, get_current_active_user
-from app.schemas.user import UserResponse,RegisterUser
-from app.services.user_service import register_user_to_db;
+from app.schemas.user import UserResponse,RegisterUser,LoginUser,LoginWarehouseUser
+from app.services.user_service import register_user_to_db,login_warehouse_user;
 
 router = APIRouter()
 
@@ -33,9 +33,28 @@ def read_users(
 async def register_user(request_body:RegisterUser):
     try:
         result=await register_user_to_db(request_body)
-        print(result,'result')
         return  result
     except Exception as e :
-        print('inside the error conditions',e)
-        return e
-    
+        raise HTTPException(status_code=500, detail={
+            "message":"internal server error"
+        })
+
+
+@router.post('/login-warehouse-user')
+async def login_user(request_body:LoginWarehouseUser):
+    try:
+        result=await login_warehouse_user(request_body)
+        return  {
+            "message":"user is logged in successfully",
+            "userdetails":result
+        }
+    except Exception as e :
+            raise HTTPException(status_code=500, detail={
+                 "message":"internal server error"
+            })
+
+
+
+
+
+# @router.post('/')

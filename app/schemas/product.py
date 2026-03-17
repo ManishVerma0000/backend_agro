@@ -24,6 +24,7 @@ class ProductBase(BaseModel):
     shelfLife: Optional[str] = None
     storage: Optional[str] = None
     variations: Optional[List[Dict[str, Any]]] = None
+    b2bBulkSlabs: Optional[List[Dict[str, Any]]] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -50,6 +51,7 @@ class ProductUpdate(BaseModel):
     shelfLife: Optional[str] = None
     storage: Optional[str] = None
     variations: Optional[List[Dict[str, Any]]] = None
+    b2bBulkSlabs: Optional[List[Dict[str, Any]]] = None
 
 class ProductResponse(ProductBase):
     id: str
