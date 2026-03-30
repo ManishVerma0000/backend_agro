@@ -5,7 +5,41 @@ from app.schemas.product import ProductCreate, ProductUpdate
 
 async def get_products() -> List[dict]:
     db = get_db()
-    cursor = db["products"].find()
+    
+    pipeline = [
+        {
+            "$addFields": {
+                "categoryObjectId": {"$toObjectId": "$categoryId"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "categories",
+                "localField": "categoryObjectId",
+                "foreignField": "_id",
+                "as": "category_info"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$category_info",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$addFields": {
+                "category": "$category_info.name"
+            }
+        },
+        {
+            "$project": {
+                "categoryObjectId": 0,
+                "category_info": 0
+            }
+        }
+    ]
+    
+    cursor = db["products"].aggregate(pipeline)
     products = []
     async for prod in cursor:
         prod["id"] = str(prod.pop("_id"))
@@ -14,10 +48,50 @@ async def get_products() -> List[dict]:
 
 async def get_product(product_id: str) -> Optional[dict]:
     db = get_db()
-    prod = await db["products"].find_one({"_id": ObjectId(product_id)})
-    if prod:
+    
+    pipeline = [
+        {
+            "$match": {"_id": ObjectId(product_id)}
+        },
+        {
+            "$addFields": {
+                "categoryObjectId": {"$toObjectId": "$categoryId"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "categories",
+                "localField": "categoryObjectId",
+                "foreignField": "_id",
+                "as": "category_info"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$category_info",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$addFields": {
+                "category": "$category_info.name"
+            }
+        },
+        {
+            "$project": {
+                "categoryObjectId": 0,
+                "category_info": 0
+            }
+        }
+    ]
+    
+    cursor = db["products"].aggregate(pipeline)
+    products = []
+    async for prod in cursor:
         prod["id"] = str(prod.pop("_id"))
-    return prod
+        products.append(prod)
+        
+    return products[0] if products else None
 
 async def create_product(product_in: ProductCreate) -> dict:
     db = get_db()

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.routes import users, auth, upload, categories, subcategories, products, warehouses, orders, dashboard
+from app.api.routes import users, auth, upload, categories, subcategories, products, warehouses, orders, dashboard, inventory, procurement, warehouse_products, stock_action
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -9,5 +9,9 @@ api_router.include_router(categories.router, prefix="/categories", tags=["catego
 api_router.include_router(subcategories.router, prefix="/subcategories", tags=["subcategories"])
 api_router.include_router(products.router, prefix="/products", tags=["products"])
 api_router.include_router(warehouses.router, prefix="/warehouses", tags=["warehouses"])
+api_router.include_router(warehouse_products.router, prefix="/warehouse-products", tags=["warehouse-products"])
+api_router.include_router(stock_action.router, prefix="/stock-actions", tags=["stock-actions"])
 api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(inventory.router, prefix="/inventory", tags=["inventory"])
+api_router.include_router(procurement.router, prefix="/procurement", tags=["procurement"])
