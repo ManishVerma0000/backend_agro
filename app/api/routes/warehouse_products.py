@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Path
 from typing import List, Optional
-from app.schemas.warehouse_product import WarehouseProductCreate, WarehouseProductUpdate, WarehouseProductResponse
+from app.schemas.warehouse_product import WarehouseProductCreate, WarehouseProductUpdate, WarehouseProductResponse, StockActionCreate
 from app.crud.warehouse_product import (
     get_warehouse_products,
     get_warehouse_product,
     create_warehouse_product,
     update_warehouse_product,
-    delete_warehouse_product
+    delete_warehouse_product,
+    apply_stock_action
 )
 
 router = APIRouter()
@@ -39,3 +40,10 @@ async def delete_warehouse_product_endpoint(id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Warehouse product not found")
     return {"message": "Warehouse product deleted successfully"}
+
+@router.post("/{id}/stock-action", response_model=WarehouseProductResponse)
+async def stock_action_endpoint(id: str, action_in: StockActionCreate):
+    product = await apply_stock_action(id, action_in)
+    if not product:
+        raise HTTPException(status_code=404, detail="Warehouse product not found")
+    return product
