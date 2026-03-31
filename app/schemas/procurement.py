@@ -7,7 +7,16 @@ class SupplierBase(BaseModel):
     email: str
     phone: str
     address: Optional[str] = None
+    location: str
+    gstNumber: Optional[str] = None
     status: str = "Active"
+    
+    # Tracking metrics (defaults to 0 for a new supplier)
+    products: int = 0
+    poCount: int = 0
+    totalAmount: float = 0.0
+    pendingAmount: float = 0.0
+    paidAmount: float = 0.0
 
 class SupplierCreate(SupplierBase):
     pass
@@ -18,7 +27,15 @@ class SupplierUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    location: Optional[str] = None
+    gstNumber: Optional[str] = None
     status: Optional[str] = None
+    
+    products: Optional[int] = None
+    poCount: Optional[int] = None
+    totalAmount: Optional[float] = None
+    pendingAmount: Optional[float] = None
+    paidAmount: Optional[float] = None
 
 class SupplierResponse(SupplierBase):
     id: str

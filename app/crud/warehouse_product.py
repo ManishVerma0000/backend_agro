@@ -2,6 +2,9 @@ from typing import List, Optional
 from bson import ObjectId
 from app.db.session import get_db
 from app.schemas.warehouse_product import WarehouseProductCreate, WarehouseProductUpdate, StockActionCreate
+from app.schemas.inventory_movement import InventoryMovementCreate
+from app.crud.inventory_movement import log_movement
+from datetime import datetime
 
 async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
     db = get_db()
@@ -62,7 +65,8 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
                 "productName": "$product_info.name",
                 "category": "$category_info.name",
                 "subcategory": "$subcategory_info.name",
-                "hsnCode": "$product_info.hsn"
+                "hsnCode": "$product_info.hsn",
+                "baseUnit": "$product_info.baseUnit"
             }
         },
         {
@@ -140,7 +144,8 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
                 "productName": "$product_info.name",
                 "category": "$category_info.name",
                 "subcategory": "$subcategory_info.name",
-                "hsnCode": "$product_info.hsn"
+                "hsnCode": "$product_info.hsn",
+                "baseUnit": "$product_info.baseUnit"
             }
         },
         {
@@ -172,6 +177,21 @@ async def create_warehouse_product(product_in: WarehouseProductCreate) -> dict:
     prod_dict["stockIn"] = stock
     
     result = await db["warehouse_products"].insert_one(prod_dict)
+    
+    if stock > 0:
+        movement = InventoryMovementCreate(
+            productId=prod_dict["productId"],
+            warehouseId=prod_dict.get("warehouseId"),
+            type="Stock In",
+            quantity=stock,
+            prevStock=0,
+            newStock=stock,
+            reference="Initial Stock",
+            user="System",
+            date=datetime.utcnow()
+        )
+        await log_movement(movement)
+        
     return await get_warehouse_product(str(result.inserted_id))
 
 async def update_warehouse_product(product_id: str, product_in: WarehouseProductUpdate) -> Optional[dict]:
@@ -200,22 +220,29 @@ async def apply_stock_action(product_id: str, action_in: StockActionCreate) -> O
 
     update_query = {"$inc": {}}
 
+    prev_stock = prod.get("currentStock", 0)
+    new_stock = prev_stock
+
     if action == 'Add Stock':
         update_query["$inc"]["currentStock"] = qty
         update_query["$inc"]["availableStock"] = qty
         update_query["$inc"]["stockIn"] = qty
+        new_stock = prev_stock + qty
     elif action == 'Reduce Stock':
         update_query["$inc"]["currentStock"] = -qty
         update_query["$inc"]["availableStock"] = -qty
         update_query["$inc"]["stockOut"] = qty
+        new_stock = prev_stock - qty
     elif action == 'Update Missing Stock':
         update_query["$inc"]["currentStock"] = -qty
         update_query["$inc"]["availableStock"] = -qty
         update_query["$inc"]["missingStock"] = qty
+        new_stock = prev_stock - qty
     elif action == 'Update Wastage Stock':
         update_query["$inc"]["currentStock"] = -qty
         update_query["$inc"]["availableStock"] = -qty
         update_query["$inc"]["wastageStock"] = qty
+        new_stock = prev_stock - qty
     elif action == 'Update Reorder Level':
         # Reorder is $set, not $inc
         update_query = {"$set": {"reorderLevel": qty}}
@@ -226,6 +253,26 @@ async def apply_stock_action(product_id: str, action_in: StockActionCreate) -> O
             update_query
         )
     
-    # Store action in a separate movements table in a real app, just updating stock for now
+    # Store action in a separate movements table
+    if action != 'Update Reorder Level':
+        type_mapping = {
+            'Add Stock': 'Stock In',
+            'Reduce Stock': 'Order Fulfillment',
+            'Update Missing Stock': 'Missing Stock',
+            'Update Wastage Stock': 'Wastage' 
+        }
+        ref = action_in.reason if action_in.reason else "Manual Update"
+        movement = InventoryMovementCreate(
+            productId=prod["productId"],
+            warehouseId=prod.get("warehouseId"),
+            type=type_mapping.get(action, action),
+            quantity=qty if action == 'Add Stock' else -qty,
+            prevStock=prev_stock,
+            newStock=new_stock,
+            reference=ref,
+            user="Admin",
+            date=datetime.utcnow()
+        )
+        await log_movement(movement)
     
     return await get_warehouse_product(product_id)

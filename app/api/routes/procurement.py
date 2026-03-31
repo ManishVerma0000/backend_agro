@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import List
 from app.schemas.procurement import SupplierCreate, SupplierUpdate, SupplierResponse, PurchaseOrderCreate, PurchaseOrderUpdate, PurchaseOrderResponse
+from app.schemas.supplier_product import SupplierProductCreate, SupplierProductUpdate, SupplierProductResponse
 from app.crud import procurement as crud_procurement
+from app.crud import supplier_product as crud_supplier_product
 
 router = APIRouter()
 
@@ -33,6 +35,32 @@ async def delete_supplier(supplier_id: str):
     success = await crud_procurement.delete_supplier(supplier_id)
     if not success:
         raise HTTPException(status_code=404, detail="Supplier not found")
+
+# Supplier Products
+@router.get("/suppliers/{supplier_id}/products", response_model=List[SupplierProductResponse])
+async def read_supplier_products(supplier_id: str):
+    return await crud_supplier_product.get_supplier_products(supplier_id)
+
+@router.get("/supplier-products", response_model=List[SupplierProductResponse])
+async def read_all_supplier_products():
+    return await crud_supplier_product.get_all_supplier_products()
+
+@router.post("/supplier-products", response_model=SupplierProductResponse, status_code=status.HTTP_201_CREATED)
+async def create_supplier_product(product_in: SupplierProductCreate):
+    return await crud_supplier_product.create_supplier_product(product_in)
+
+@router.put("/supplier-products/{product_id}", response_model=SupplierProductResponse)
+async def update_supplier_product(product_id: str, product_in: SupplierProductUpdate):
+    p = await crud_supplier_product.update_supplier_product(product_id, product_in)
+    if not p:
+        raise HTTPException(status_code=404, detail="Supplier Product not found")
+    return p
+
+@router.delete("/supplier-products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_supplier_product(product_id: str):
+    success = await crud_supplier_product.delete_supplier_product(product_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Supplier Product not found")
 
 # Purchase Orders
 @router.get("/purchase-orders", response_model=List[PurchaseOrderResponse])
