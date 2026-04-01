@@ -132,3 +132,46 @@ async def get_mobile_home(warehouse_id: str) -> dict:
         "categories": categories,
         "quickOrders": quick_orders
     }
+
+async def get_mobile_categories() -> List[dict]:
+    db = get_db()
+    
+    # Aggregation to fetch categories and their respective subcategories
+    pipeline = [
+        {"$match": {"status": "Active"}}, # Add match if you only want active categories
+        {
+            "$addFields": {
+                "categoryIdString": {"$toString": "$_id"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "subcategories",
+                "localField": "categoryIdString",
+                "foreignField": "categoryId",
+                "as": "subcategories"
+            }
+        },
+        {
+            "$project": {
+                "categoryIdString": 0 # Remove temporary field
+            }
+        }
+    ]
+    
+    cursor = db["categories"].aggregate(pipeline)
+    categories = []
+    async for cat in cursor:
+        cat["id"] = str(cat.pop("_id"))
+        
+        # Clean up subcategory ObjectIds
+        formatted_subs = []
+        for sub in cat.get("subcategories", []):
+            if "_id" in sub:
+                sub["id"] = str(sub.pop("_id"))
+            formatted_subs.append(sub)
+        cat["subcategories"] = formatted_subs
+        
+        categories.append(cat)
+        
+    return categories

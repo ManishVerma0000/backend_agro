@@ -26,6 +26,16 @@ async def get_customer(customer_id: str) -> Optional[dict]:
         customer["id"] = str(customer.pop("_id"))
     return customer
 
+async def update_customer(customer_id: str, customer_in: CustomerUpdate) -> Optional[dict]:
+    db = get_db()
+    update_data = customer_in.model_dump(exclude_unset=True)
+    if update_data:
+        await db["customers"].update_one(
+            {"_id": ObjectId(customer_id)},
+            {"$set": update_data}
+        )
+    return await get_customer(customer_id)
+
 # --- Addresses CRUD ---
 
 async def create_customer_address(customer_id: str, address_in: CustomerAddressCreate) -> dict:

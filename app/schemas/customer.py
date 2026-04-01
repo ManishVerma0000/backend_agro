@@ -31,6 +31,7 @@ class CustomerBase(BaseModel):
     city: Optional[str] = None
     shopType: Optional[str] = None
     aadharCardFront: Optional[str] = None
+    aadharCardBack: Optional[str] = None
     status: Optional[str] = "Active"
 
 class CustomerCreate(CustomerBase):
@@ -43,6 +44,7 @@ class CustomerUpdate(BaseModel):
     city: Optional[str] = None
     shopType: Optional[str] = None
     aadharCardFront: Optional[str] = None
+    aadharCardBack: Optional[str] = None
     status: Optional[str] = None
 
 class CustomerResponse(CustomerBase):

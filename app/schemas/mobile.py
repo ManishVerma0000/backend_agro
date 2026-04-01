@@ -24,6 +24,23 @@ class MobileCategory(BaseModel):
     name: str
     imageUrl: Optional[str] = None
 
+class MobileSubcategory(BaseModel):
+    id: str
+    name: str
+    categoryId: Optional[str] = None
+    hsnCodesCount: Optional[int] = 0
+    status: Optional[str] = None
+    imageUrl: Optional[str] = None
+
+class MobileCategoryFull(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    priority: Optional[int] = None
+    status: Optional[str] = None
+    imageUrl: Optional[str] = None
+    subcategories: List[MobileSubcategory] = []
+
 class MobileBanner(BaseModel):
     id: str
     imageUrl: str
