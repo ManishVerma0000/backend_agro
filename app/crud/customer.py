@@ -9,7 +9,7 @@ async def create_customer(customer_in: CustomerCreate) -> dict:
     cust_dict = customer_in.model_dump()
     cust_dict["createdDate"] = datetime.utcnow()
     result = await db["customers"].insert_one(cust_dict)
-    cust_dict["id"] = str(result.inserted_id)
+    cust_dict["id"] = str(cust_dict.pop("_id"))
     return cust_dict
 
 async def get_customer_by_mobile(mobile: str) -> Optional[dict]:
@@ -42,7 +42,7 @@ async def create_customer_address(customer_id: str, address_in: CustomerAddressC
         )
 
     result = await db["customer_addresses"].insert_one(addr_dict)
-    addr_dict["id"] = str(result.inserted_id)
+    addr_dict["id"] = str(addr_dict.pop("_id"))
     return addr_dict
 
 async def get_customer_addresses(customer_id: str) -> List[dict]:
