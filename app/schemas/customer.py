@@ -4,6 +4,8 @@ from datetime import datetime
 
 class CustomerAddressBase(BaseModel):
     location: Optional[str] = None
+    lat: Optional[float] = None
+    long: Optional[float] = None
     shopName: Optional[str] = None
     ownerName: Optional[str] = None
     mobileNumber: Optional[str] = None
