@@ -2,7 +2,7 @@ from typing import List, Optional
 from bson import ObjectId
 from app.db.session import get_db
 
-async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = None) -> List[dict]:
+async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = None, subcategory_id: Optional[str] = None) -> List[dict]:
     db = get_db()
     
     match_query = {
@@ -66,6 +66,10 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
     if category_id:
         pipeline.append({"$match": {"product_info.categoryId": category_id}})
 
+    # Optional Subcategory Filter
+    if subcategory_id:
+        pipeline.append({"$match": {"product_info.subcategoryId": subcategory_id}})
+
     # Projection
     pipeline.append({
         "$project": {
@@ -88,7 +92,10 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
             "mrp": "$product_info.mrp",
             "description": "$product_info.description",
             "imageUrl": "$product_info.imageUrl",
-            "baseUnit": "$product_info.baseUnit"
+            "baseUnit": "$product_info.baseUnit",
+            "productDetails": "$product_info",
+            "categoryDetails": "$category_info",
+            "subcategoryDetails": "$subcategory_info"
         }
     })
 
@@ -96,8 +103,128 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
     products = []
     async for prod in cursor:
         prod["id"] = str(prod.pop("_id"))
+        
+        # Safely parse nested ObjectIds
+        if prod.get("productDetails") and "_id" in prod["productDetails"]:
+            prod["productDetails"]["id"] = str(prod["productDetails"].pop("_id"))
+        if prod.get("categoryDetails") and "_id" in prod["categoryDetails"]:
+            prod["categoryDetails"]["id"] = str(prod["categoryDetails"].pop("_id"))
+        if prod.get("subcategoryDetails") and "_id" in prod["subcategoryDetails"]:
+            prod["subcategoryDetails"]["id"] = str(prod["subcategoryDetails"].pop("_id"))
+            
         products.append(prod)
     return products
+
+async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Optional[dict]:
+    db = get_db()
+    
+    try:
+        # We will match either the warehouse_product _id OR the global productId
+        obj_id = ObjectId(product_id) if len(product_id) == 24 else None
+        product_id_query = {"$or": [{"productId": product_id}, {"_id": obj_id}]} if obj_id else {"productId": product_id}
+    except:
+        product_id_query = {"productId": product_id}
+
+    match_query = {
+        "warehouseId": warehouse_id,
+        "status": "Active",
+        **product_id_query
+    }
+    
+    pipeline = [
+        {"$match": match_query},
+        {"$addFields": {"productObjectId": {"$toObjectId": "$productId"}}},
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "productObjectId",
+                "foreignField": "_id",
+                "as": "product_info"
+            }
+        },
+        {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
+        {"$match": {"product_info.status": "Active"}},
+        {
+            "$addFields": {
+                "categoryObjectId": {
+                    "$cond": [
+                        {"$and": [{"$ne": ["$product_info.categoryId", ""]}, {"$ne": ["$product_info.categoryId", None]}]},
+                        {"$toObjectId": "$product_info.categoryId"},
+                        None
+                    ]
+                },
+                "subcategoryObjectId": {
+                    "$cond": [
+                        {"$and": [{"$ne": ["$product_info.subcategoryId", ""]}, {"$ne": ["$product_info.subcategoryId", None]}]},
+                        {"$toObjectId": "$product_info.subcategoryId"},
+                        None
+                    ]
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "categories",
+                "localField": "categoryObjectId",
+                "foreignField": "_id",
+                "as": "category_info"
+            }
+        },
+        {"$unwind": {"path": "$category_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$lookup": {
+                "from": "subcategories",
+                "localField": "subcategoryObjectId",
+                "foreignField": "_id",
+                "as": "subcategory_info"
+            }
+        },
+        {"$unwind": {"path": "$subcategory_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$project": {
+                "_id": 1,
+                "productId": 1,
+                "availableStock": 1,
+                "status": 1,
+                "basePrice": {
+                    "$cond": [
+                        {"$and": [{"$ne": ["$basePrice", None]}, {"$gt": ["$basePrice", 0]}]},
+                        "$basePrice", 
+                        {"$toDouble": "$product_info.basePrice"}
+                    ]
+                },
+                "name": "$product_info.name",
+                "category": "$category_info.name",
+                "categoryId": "$product_info.categoryId",
+                "subcategoryId": "$product_info.subcategoryId",
+                "hsnCode": "$product_info.hsn",
+                "mrp": "$product_info.mrp",
+                "description": "$product_info.description",
+                "imageUrl": "$product_info.imageUrl",
+                "baseUnit": "$product_info.baseUnit",
+                "productDetails": "$product_info",
+                "categoryDetails": "$category_info",
+                "subcategoryDetails": "$subcategory_info"
+            }
+        }
+    ]
+
+    cursor = db["warehouse_products"].aggregate(pipeline)
+    products = []
+    async for prod in cursor:
+        prod["id"] = str(prod.pop("_id"))
+        
+        # Safely parse nested ObjectIds
+        if prod.get("productDetails") and "_id" in prod["productDetails"]:
+            prod["productDetails"]["id"] = str(prod["productDetails"].pop("_id"))
+        if prod.get("categoryDetails") and "_id" in prod["categoryDetails"]:
+            prod["categoryDetails"]["id"] = str(prod["categoryDetails"].pop("_id"))
+        if prod.get("subcategoryDetails") and "_id" in prod["subcategoryDetails"]:
+            prod["subcategoryDetails"]["id"] = str(prod["subcategoryDetails"].pop("_id"))
+            
+        products.append(prod)
+        
+    return products[0] if products else None
 
 async def get_mobile_home(warehouse_id: str) -> dict:
     db = get_db()

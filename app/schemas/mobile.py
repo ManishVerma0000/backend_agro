@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Any
 
 class MobileProductResponse(BaseModel):
     id: str
@@ -16,6 +16,9 @@ class MobileProductResponse(BaseModel):
     baseUnit: Optional[str] = None
     availableStock: Optional[int] = 0
     status: Optional[str] = None
+    productDetails: Optional[Any] = None
+    categoryDetails: Optional[Any] = None
+    subcategoryDetails: Optional[Any] = None
     
     model_config = ConfigDict(populate_by_name=True)
 
