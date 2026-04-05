@@ -59,3 +59,207 @@ async def get_customer_orders(customer_id: str) -> List[dict]:
         order["id"] = str(order.pop("_id"))
         orders.append(order)
     return orders
+
+async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
+    db = get_db()
+    pipeline = [
+        {"$match": {"warehouseId": warehouse_id}},
+        {
+            "$addFields": {
+                "customerObjectId": {"$toObjectId": "$customerId"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "customers",
+                "localField": "customerObjectId",
+                "foreignField": "_id",
+                "as": "customer_info"
+            }
+        },
+        {"$unwind": {"path": "$customer_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$addFields": {
+                "customerName": {"$ifNull": ["$customer_info.shopName", "$customer_info.ownerName", "Unknown Customer"]},
+                "location": {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+            }
+        },
+        {"$sort": {"createdAt": -1}},
+        {"$project": {"customer_info": 0, "customerObjectId": 0}}
+    ]
+    
+    cursor = db["mobile_orders"].aggregate(pipeline)
+    orders = []
+    async for order in cursor:
+        order["id"] = str(order.pop("_id"))
+        orders.append(order)
+    return orders
+
+async def get_order_by_id(order_id: str) -> Optional[dict]:
+    db = get_db()
+    
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+        
+    pipeline = [
+        {"$match": {"_id": obj_id}},
+        {
+            "$addFields": {
+                "customerObjectId": {"$toObjectId": "$customerId"},
+                "addressObjectId": {"$toObjectId": "$deliveryAddressId"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "customers",
+                "localField": "customerObjectId",
+                "foreignField": "_id",
+                "as": "customer_info"
+            }
+        },
+        {"$unwind": {"path": "$customer_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$lookup": {
+                "from": "customer_addresses",
+                "localField": "addressObjectId",
+                "foreignField": "_id",
+                "as": "address_info"
+            }
+        },
+        {"$unwind": {"path": "$address_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$addFields": {
+                "customerName": {"$ifNull": ["$customer_info.shopName", "$customer_info.ownerName", "Unknown Customer"]},
+                "customerPhone": {"$ifNull": ["$customer_info.mobileNumber", "Unknown Phone"]},
+                "customerEmail": {"$ifNull": ["$customer_info.email", "N/A"]},
+                "location": {
+                    "$cond": [
+                        {"$ne": ["$address_info", None]},
+                        {"$concat": [
+                            {"$ifNull": ["$address_info.shopName", ""]}, ", ",
+                            {"$ifNull": ["$address_info.location", ""]}
+                        ]},
+                        {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+                    ]
+                }
+            }
+        },
+        {"$project": {"customer_info": 0, "customerObjectId": 0, "address_info": 0, "addressObjectId": 0}}
+    ]
+    
+    cursor = db["mobile_orders"].aggregate(pipeline)
+    async for order in cursor:
+        order["id"] = str(order.pop("_id"))
+        return order
+        
+    return None
+
+
+async def confirm_order(order_id: str) -> Optional[dict]:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+    
+    result = await db["mobile_orders"].update_one(
+        {"_id": obj_id},
+        {"$set": {"status": "Confirmed"}}
+    )
+    
+    if result.matched_count == 0:
+        return None
+    
+    return await get_order_by_id(order_id)
+
+
+async def start_picking(order_id: str) -> Optional[dict]:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+    
+    result = await db["mobile_orders"].update_one(
+        {"_id": obj_id},
+        {"$set": {"status": "Picking"}}
+    )
+    
+    if result.matched_count == 0:
+        return None
+    
+    return await get_order_by_id(order_id)
+
+
+async def get_warehouse_orders_by_status(warehouse_id: str, status: str) -> List[dict]:
+    db = get_db()
+    pipeline = [
+        {"$match": {"warehouseId": warehouse_id, "status": status}},
+        {
+            "$addFields": {
+                "customerObjectId": {"$toObjectId": "$customerId"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "customers",
+                "localField": "customerObjectId",
+                "foreignField": "_id",
+                "as": "customer_info"
+            }
+        },
+        {"$unwind": {"path": "$customer_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$addFields": {
+                "customerName": {"$ifNull": ["$customer_info.shopName", "$customer_info.ownerName", "Unknown Customer"]},
+                "location": {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+            }
+        },
+        {"$sort": {"createdAt": -1}},
+        {"$project": {"customer_info": 0, "customerObjectId": 0}}
+    ]
+    
+    cursor = db["mobile_orders"].aggregate(pipeline)
+    orders = []
+    async for order in cursor:
+        order["id"] = str(order.pop("_id"))
+        orders.append(order)
+    return orders
+
+
+async def start_packing(order_id: str) -> Optional[dict]:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+
+    result = await db["mobile_orders"].update_one(
+        {"_id": obj_id},
+        {"$set": {"status": "Packing"}}
+    )
+
+    if result.matched_count == 0:
+        return None
+
+    return await get_order_by_id(order_id)
+
+
+async def ready_for_dispatch(order_id: str) -> Optional[dict]:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+
+    result = await db["mobile_orders"].update_one(
+        {"_id": obj_id},
+        {"$set": {"status": "Ready for Dispatch"}}
+    )
+
+    if result.matched_count == 0:
+        return None
+
+    return await get_order_by_id(order_id)
