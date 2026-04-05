@@ -20,23 +20,18 @@ async def register(
     shopName: str = Form(...),
     ownerName: str = Form(...),
     mobileNumber: str = Form(...),
-    otp: str = Form(...),
     city: Optional[str] = Form(None),
     shopType: Optional[str] = Form(None),
     status: Optional[str] = Form("Active"),
     aadharCardFront: Optional[UploadFile] = File(None),
     aadharCardBack: Optional[UploadFile] = File(None)
 ):
-    # 1. Verify OTP
-    if otp != "1234":
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    
-    # 2. Check if customer already exists
+    # 1. Check if customer already exists
     existing = await get_customer_by_mobile(mobileNumber)
     if existing:
         raise HTTPException(status_code=400, detail="Customer with this mobile number already exists")
         
-    # 3. Handle image uploads via S3
+    # 2. Handle image uploads via S3
     front_url = None
     back_url = None
     if aadharCardFront and getattr(aadharCardFront, 'filename', None):
@@ -44,7 +39,7 @@ async def register(
     if aadharCardBack and getattr(aadharCardBack, 'filename', None):
         back_url = await upload_image_to_s3(aadharCardBack)
     
-    # 4. Create customer
+    # 3. Create customer
     customer_in = CustomerCreate(
         shopName=shopName,
         ownerName=ownerName,
@@ -57,12 +52,12 @@ async def register(
     )
     customer = await create_customer(customer_in)
     
-    # 5. Generate Token
-    token = create_access_token(str(customer["id"]))
+    # 4. Simulate sending OTP
+    print(f"Sending mock OTP 1234 to {mobileNumber}")
     
     return {
-        "message": "Registration successful",
-        "token": token,
+        "message": "Details saved and OTP sent successfully",
+        "success": True,
         "customer": customer
     }
 
