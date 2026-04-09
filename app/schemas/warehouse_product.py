@@ -40,6 +40,7 @@ class WarehouseProductResponse(WarehouseProductBase):
     category: Optional[str] = None
     subcategory: Optional[str] = None
     hsnCode: Optional[str] = None
+    sellingPrice: Optional[float] = 0.0
     
     model_config = ConfigDict(populate_by_name=True)
 

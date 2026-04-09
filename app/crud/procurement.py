@@ -53,10 +53,49 @@ async def get_purchase_orders() -> List[dict]:
 
 async def get_purchase_order(po_id: str) -> Optional[dict]:
     db = get_db()
-    p = await db["purchase_orders"].find_one({"_id": ObjectId(po_id)})
-    if p:
+    
+    pipeline = [
+        {"$match": {"_id": ObjectId(po_id)}},
+        {"$unwind": {"path": "$items", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {"productObjectId": {
+            "$cond": [{"$eq": ["$items.productId", ""]}, None, {"$toObjectId": "$items.productId"}]
+        }}},
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "productObjectId",
+                "foreignField": "_id",
+                "as": "product_info"
+            }
+        },
+        {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$addFields": {
+                "items.unit": "$product_info.baseUnit"
+            }
+        },
+        {
+            "$group": {
+                "_id": "$_id",
+                "poNumber": {"$first": "$poNumber"},
+                "supplierId": {"$first": "$supplierId"},
+                "supplierName": {"$first": "$supplierName"},
+                "orderDate": {"$first": "$orderDate"},
+                "expectedDelivery": {"$first": "$expectedDelivery"},
+                "totalAmount": {"$first": "$totalAmount"},
+                "status": {"$first": "$status"},
+                "items": {"$push": "$items"}
+            }
+        }
+    ]
+    
+    cursor = db["purchase_orders"].aggregate(pipeline)
+    pos = []
+    async for p in cursor:
         p["id"] = str(p.pop("_id"))
-    return p
+        pos.append(p)
+        
+    return pos[0] if pos else None
 
 async def create_purchase_order(po_in: PurchaseOrderCreate) -> dict:
     db = get_db()

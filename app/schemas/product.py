@@ -23,8 +23,10 @@ class ProductBase(BaseModel):
     origin: Optional[str] = None
     shelfLife: Optional[str] = None
     storage: Optional[str] = None
-    variations: Optional[List[Dict[str, Any]]] = None
     b2bBulkSlabs: Optional[List[Dict[str, Any]]] = None
+    procurementUnit: Optional[str] = None
+    conversionRate: Optional[float] = 1.0
+    baseMargin: Optional[str] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -50,8 +52,10 @@ class ProductUpdate(BaseModel):
     origin: Optional[str] = None
     shelfLife: Optional[str] = None
     storage: Optional[str] = None
-    variations: Optional[List[Dict[str, Any]]] = None
     b2bBulkSlabs: Optional[List[Dict[str, Any]]] = None
+    procurementUnit: Optional[str] = None
+    conversionRate: Optional[float] = None
+    baseMargin: Optional[str] = None
 
 class ProductResponse(ProductBase):
     id: str

@@ -14,7 +14,10 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
 
     pipeline = [
         {"$match": match_query},
-        {"$addFields": {"productObjectId": {"$toObjectId": "$productId"}}},
+        {"$addFields": {
+            "productObjectId": {"$toObjectId": "$productId"},
+            "warehouseObjectId": {"$toObjectId": "$warehouseId"}
+        }},
         {
             "$lookup": {
                 "from": "products",
@@ -24,6 +27,15 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
             }
         },
         {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$lookup": {
+                "from": "warehouses",
+                "localField": "warehouseObjectId",
+                "foreignField": "_id",
+                "as": "warehouse_info"
+            }
+        },
+        {"$unwind": {"path": "$warehouse_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
                 "categoryObjectId": {
@@ -66,13 +78,31 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
                 "category": "$category_info.name",
                 "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
-                "baseUnit": "$product_info.baseUnit"
+                "baseUnit": "$product_info.baseUnit",
+                "sellingPrice": {
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {"$toDouble": {"$ifNull": ["$product_info.baseMargin", 0]}}
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$bp", "$$oc", "$$lc"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
+                        }
+                    }
+                }
             }
         },
         {
             "$project": {
                 "productObjectId": 0,
+                "warehouseObjectId": 0,
                 "product_info": 0,
+                "warehouse_info": 0,
                 "categoryObjectId": 0,
                 "category_info": 0,
                 "subcategoryObjectId": 0,
@@ -93,7 +123,10 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
     
     pipeline = [
         {"$match": {"_id": ObjectId(product_id)}},
-        {"$addFields": {"productObjectId": {"$toObjectId": "$productId"}}},
+        {"$addFields": {
+            "productObjectId": {"$toObjectId": "$productId"},
+            "warehouseObjectId": {"$toObjectId": "$warehouseId"}
+        }},
         {
             "$lookup": {
                 "from": "products",
@@ -103,6 +136,15 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
             }
         },
         {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
+        {
+            "$lookup": {
+                "from": "warehouses",
+                "localField": "warehouseObjectId",
+                "foreignField": "_id",
+                "as": "warehouse_info"
+            }
+        },
+        {"$unwind": {"path": "$warehouse_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
                 "categoryObjectId": {
@@ -145,13 +187,31 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
                 "category": "$category_info.name",
                 "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
-                "baseUnit": "$product_info.baseUnit"
+                "baseUnit": "$product_info.baseUnit",
+                "sellingPrice": {
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {"$toDouble": {"$ifNull": ["$product_info.baseMargin", 0]}}
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$bp", "$$oc", "$$lc"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
+                        }
+                    }
+                }
             }
         },
         {
             "$project": {
                 "productObjectId": 0,
+                "warehouseObjectId": 0,
                 "product_info": 0,
+                "warehouse_info": 0,
                 "categoryObjectId": 0,
                 "category_info": 0,
                 "subcategoryObjectId": 0,
