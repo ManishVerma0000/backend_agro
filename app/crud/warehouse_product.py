@@ -84,14 +84,10 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
                         "vars": {
                             "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
                             "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
-                            "mg": {"$toDouble": {"$ifNull": ["$product_info.baseMargin", 0]}}
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}}
                         },
                         "in": {
-                            "$multiply": [
-                                {"$add": ["$$bp", "$$oc", "$$lc"]},
-                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
-                            ]
+                            "$add": ["$$bp", "$$oc", "$$lc"]
                         }
                     }
                 }
@@ -193,14 +189,10 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
                         "vars": {
                             "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
                             "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
-                            "mg": {"$toDouble": {"$ifNull": ["$product_info.baseMargin", 0]}}
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}}
                         },
                         "in": {
-                            "$multiply": [
-                                {"$add": ["$$bp", "$$oc", "$$lc"]},
-                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
-                            ]
+                            "$add": ["$$bp", "$$oc", "$$lc"]
                         }
                     }
                 }
