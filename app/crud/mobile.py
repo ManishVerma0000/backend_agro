@@ -2,7 +2,7 @@ from typing import List, Optional
 from bson import ObjectId
 from app.db.session import get_db
 
-async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = None, subcategory_id: Optional[str] = None) -> List[dict]:
+async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = None, subcategory_id: Optional[str] = None, search: Optional[str] = None) -> List[dict]:
     db = get_db()
     
     match_query = {
@@ -69,6 +69,10 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
     # Optional Subcategory Filter
     if subcategory_id:
         pipeline.append({"$match": {"product_info.subcategoryId": subcategory_id}})
+
+    # Optional Search Filter
+    if search:
+        pipeline.append({"$match": {"product_info.name": {"$regex": search, "$options": "i"}}})
 
     # Projection
     pipeline.append({

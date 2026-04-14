@@ -13,15 +13,18 @@ async def read_mobile_home(warehouse_id: str = Query(...)):
 async def read_mobile_products(
     warehouse_id: str = Query(...), 
     category_id: Optional[str] = Query(None),
-    subcategory_id: Optional[str] = Query(None)
+    subcategory_id: Optional[str] = Query(None),
+    search: Optional[str] = Query(None)
 ):
     # Handle Javascript "undefined" being passed as a string
     if category_id == "undefined":
         category_id = None
     if subcategory_id == "undefined":
         subcategory_id = None
+    if search == "undefined":
+        search = None
         
-    return await get_mobile_products(warehouse_id, category_id, subcategory_id)
+    return await get_mobile_products(warehouse_id, category_id, subcategory_id, search)
 
 @router.get("/products/{product_id}", response_model=MobileProductResponse)
 async def read_mobile_product_details(

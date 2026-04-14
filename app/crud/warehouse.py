@@ -22,9 +22,14 @@ async def get_warehouse(warehouse_id: str) -> Optional[dict]:
 async def create_warehouse(warehouse_in: WarehouseCreate) -> dict:
     db = get_db()
     w_dict = warehouse_in.model_dump()
-    # Explicitly ensure these fields are present in the dictionary
-    w_dict["overheadCost"] = float(w_dict.get("overheadCost", 0.0))
-    w_dict["logisticCost"] = float(w_dict.get("logisticCost", 0.0))
+    
+    # Ensure overheadCost and logisticCost are explicitly set from the model attributes
+    w_dict["overheadCost"] = float(warehouse_in.overheadCost)
+    w_dict["logisticCost"] = float(warehouse_in.logisticCost)
+    
+    # Debug: Write to a file to verify what the backend receives
+    with open("warehouse_debug.txt", "a") as f:
+        f.write(f"CREATE DATA: {w_dict}\n")
     
     result = await db["warehouses"].insert_one(w_dict)
     return await get_warehouse(str(result.inserted_id))
@@ -35,12 +40,14 @@ async def update_warehouse(warehouse_id: str, warehouse_in: WarehouseUpdate) -> 
     if update_data:
         # Debug: Write to a file to verify what the backend receives
         with open("warehouse_debug.txt", "a") as f:
-            f.write(f"ID: {warehouse_id}, DATA: {update_data}\n")
+            f.write(f"UPDATE ID: {warehouse_id}, DATA: {update_data}\n")
             
-        if "overheadCost" in update_data:
+        # Ensure proper type conversion if present
+        if "overheadCost" in update_data and update_data["overheadCost"] is not None:
             update_data["overheadCost"] = float(update_data["overheadCost"])
-        if "logisticCost" in update_data:
+        if "logisticCost" in update_data and update_data["logisticCost"] is not None:
             update_data["logisticCost"] = float(update_data["logisticCost"])
+            
         await db["warehouses"].update_one(
             {"_id": ObjectId(warehouse_id)},
             {"$set": update_data}

@@ -22,8 +22,6 @@ class WarehouseBase(BaseModel):
     documents: list[str] = []
     status: str
     createdDate: str
-    overheadCost: float = 0.0
-    logisticCost: float = 0.0
 
 class WarehouseCreate(WarehouseBase):
     pass
@@ -47,8 +45,8 @@ class WarehouseUpdate(BaseModel):
     documents: Optional[list[str]] = None
     status: Optional[str] = None
     createdDate: Optional[str] = None
-    overheadCost: Optional[float] = 0.0
-    logisticCost: Optional[float] = 0.0
+    overheadCost: Optional[float] = None
+    logisticCost: Optional[float] = None
 
 class WarehouseResponse(WarehouseBase):
     id: str
