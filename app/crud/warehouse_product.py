@@ -84,10 +84,27 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
                         "vars": {
                             "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
                             "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}}
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
+                                        }
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
+                                }
+                            }
                         },
                         "in": {
-                            "$add": ["$$bp", "$$oc", "$$lc"]
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
                         }
                     }
                 }
@@ -189,10 +206,27 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
                         "vars": {
                             "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
                             "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}}
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
+                                        }
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
+                                }
+                            }
                         },
                         "in": {
-                            "$add": ["$$bp", "$$oc", "$$lc"]
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
                         }
                     }
                 }
@@ -298,6 +332,8 @@ async def apply_stock_action(product_id: str, action_in: StockActionCreate) -> O
     elif action == 'Update Reorder Level':
         # Reorder is $set, not $inc
         update_query = {"$set": {"reorderLevel": qty}}
+    elif action == 'Update Base Price':
+        update_query = {"$set": {"basePrice": qty}}
     
     if update_query:
         await db["warehouse_products"].update_one(
@@ -306,7 +342,7 @@ async def apply_stock_action(product_id: str, action_in: StockActionCreate) -> O
         )
     
     # Store action in a separate movements table
-    if action != 'Update Reorder Level':
+    if action not in ['Update Reorder Level', 'Update Base Price']:
         type_mapping = {
             'Add Stock': 'Stock In',
             'Reduce Stock': 'Order Fulfillment',
