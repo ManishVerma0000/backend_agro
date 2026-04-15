@@ -6,7 +6,97 @@ from app.schemas.procurement import SupplierCreate, SupplierUpdate, PurchaseOrde
 # Suppliers
 async def get_suppliers() -> List[dict]:
     db = get_db()
-    cursor = db["suppliers"].find()
+    pipeline = [
+        {
+            "$addFields": {
+                "supplierIdStr": {"$toString": "$_id"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "purchase_orders",
+                "localField": "supplierIdStr",
+                "foreignField": "supplierId",
+                "as": "pos"
+            }
+        },
+        {
+            "$addFields": {
+                "poCount": {"$size": "$pos"},
+                "totalAmount": {
+                    "$sum": "$pos.totalAmount"
+                },
+                "pendingAmount": {
+                    "$sum": {
+                        "$map": {
+                            "input": "$pos",
+                            "as": "po",
+                            "in": {
+                                "$cond": [
+                                    {"$ne": ["$$po.status", "Received"]},
+                                    {"$ifNull": ["$$po.totalAmount", 0]},
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                },
+                "paidAmount": {
+                    "$sum": {
+                        "$map": {
+                            "input": "$pos",
+                            "as": "po",
+                            "in": {
+                                "$cond": [
+                                    {"$eq": ["$$po.status", "Received"]},
+                                    {"$ifNull": ["$$po.totalAmount", 0]},
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                },
+                "productsSet": {
+                    "$reduce": {
+                        "input": "$pos",
+                        "initialValue": [],
+                        "in": {
+                            "$setUnion": [
+                                "$$value",
+                                {
+                                    "$filter": {
+                                        "input": {
+                                            "$map": {
+                                                "input": {"$ifNull": ["$$this.items", []]},
+                                                "as": "itm",
+                                                "in": {"$ifNull": ["$$itm.productId", None]}
+                                            }
+                                        },
+                                        "as": "pid",
+                                        "cond": {"$ne": ["$$pid", None]}
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "products": {"$size": "$productsSet"}
+            }
+        },
+        {
+            "$project": {
+                "pos": 0,
+                "supplierIdStr": 0,
+                "productsSet": 0
+            }
+        }
+    ]
+    
+    cursor = db["suppliers"].aggregate(pipeline)
     suppliers = []
     async for s in cursor:
         s["id"] = str(s.pop("_id"))
@@ -15,10 +105,102 @@ async def get_suppliers() -> List[dict]:
 
 async def get_supplier(supplier_id: str) -> Optional[dict]:
     db = get_db()
-    s = await db["suppliers"].find_one({"_id": ObjectId(supplier_id)})
-    if s:
+    pipeline = [
+        {"$match": {"_id": ObjectId(supplier_id)}},
+        {
+            "$addFields": {
+                "supplierIdStr": {"$toString": "$_id"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "purchase_orders",
+                "localField": "supplierIdStr",
+                "foreignField": "supplierId",
+                "as": "pos"
+            }
+        },
+        {
+            "$addFields": {
+                "poCount": {"$size": "$pos"},
+                "totalAmount": {
+                    "$sum": "$pos.totalAmount"
+                },
+                "pendingAmount": {
+                    "$sum": {
+                        "$map": {
+                            "input": "$pos",
+                            "as": "po",
+                            "in": {
+                                "$cond": [
+                                    {"$ne": ["$$po.status", "Received"]},
+                                    {"$ifNull": ["$$po.totalAmount", 0]},
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                },
+                "paidAmount": {
+                    "$sum": {
+                        "$map": {
+                            "input": "$pos",
+                            "as": "po",
+                            "in": {
+                                "$cond": [
+                                    {"$eq": ["$$po.status", "Received"]},
+                                    {"$ifNull": ["$$po.totalAmount", 0]},
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                },
+                "productsSet": {
+                    "$reduce": {
+                        "input": "$pos",
+                        "initialValue": [],
+                        "in": {
+                            "$setUnion": [
+                                "$$value",
+                                {
+                                    "$filter": {
+                                        "input": {
+                                            "$map": {
+                                                "input": {"$ifNull": ["$$this.items", []]},
+                                                "as": "itm",
+                                                "in": {"$ifNull": ["$$itm.productId", None]}
+                                            }
+                                        },
+                                        "as": "pid",
+                                        "cond": {"$ne": ["$$pid", None]}
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "products": {"$size": "$productsSet"}
+            }
+        },
+        {
+            "$project": {
+                "pos": 0,
+                "supplierIdStr": 0,
+                "productsSet": 0
+            }
+        }
+    ]
+    cursor = db["suppliers"].aggregate(pipeline)
+    suppliers = []
+    async for s in cursor:
         s["id"] = str(s.pop("_id"))
-    return s
+        suppliers.append(s)
+    return suppliers[0] if suppliers else None
 
 async def create_supplier(supplier_in: SupplierCreate) -> dict:
     db = get_db()

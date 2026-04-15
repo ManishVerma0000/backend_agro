@@ -35,6 +35,13 @@ class CustomerBase(BaseModel):
     aadharCardFront: Optional[str] = None
     aadharCardBack: Optional[str] = None
     status: Optional[str] = "Active"
+    
+    # Analytics/Computed fields
+    totalOrders: Optional[int] = 0
+    totalSpent: Optional[float] = 0.0
+    lastOrderDate: Optional[datetime] = None
+    customerType: Optional[str] = "New"
+    customerStatus: Optional[str] = "Active"
 
 class CustomerCreate(CustomerBase):
     pass
