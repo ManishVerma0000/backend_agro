@@ -24,3 +24,8 @@ async def send_otp(phone):
 def generate_otp():
     otp=  random.randint(1000,9999)
     return otp
+
+async def send_email_otp(email: str):
+    # For now, returning static OTP 1234 as per user request
+    print(f"Sending OTP 1234 to email {email}")
+    return 1234

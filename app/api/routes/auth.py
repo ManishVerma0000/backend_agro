@@ -33,7 +33,21 @@ async def login_user(request_body:LoginUser):
         return {
             "message":"please enter the username"
         }
+        
+    # Hardcoded admin credentials for the time being
+    if request_body.username == "admin" and request_body.password == "admin":
+        token = create_access_token("admin_hardcoded_id_123")
+        return {
+            "message": "User is logged in successfully",
+            "token": token
+        }
+
     user = await get_user_by_username(request_body.username)
+    if not user:
+        return {
+            "message":"invalid username"
+        }
+    
     if not verify_password(request_body.password,user['hashed_password']):
         return {
             "message":"invalid password"

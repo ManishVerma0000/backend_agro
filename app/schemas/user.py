@@ -41,11 +41,9 @@ class LoginUser(BaseModel):
 
 
 class RegisterUser(BaseModel):
-    phone_number:int
+    email: str
     otp: Optional[int] = None
 
-
-
 class LoginWarehouseUser(BaseModel):
-    phone_number:int
-    otp:int   
+    email: str
+    otp: int   
