@@ -19,6 +19,11 @@ class MobileCartItemCreate(BaseModel):
 class MobileCartItemUpdate(BaseModel):
     quantity: int
 
+class MobileCartBulkUpdate(BaseModel):
+    customerId: str
+    warehouseId: str
+    items: List[dict] # List of {productId: str, quantity: int}
+
 class MobileCartItemResponse(MobileCartItemBase):
     id: str
     productDetails: Optional[Any] = None

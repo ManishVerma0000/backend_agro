@@ -1,7 +1,50 @@
 from typing import List, Optional, Dict
 from bson import ObjectId
 from app.db.session import get_db
-from app.schemas.mobile_cart import MobileCartItemCreate, MobileCartItemUpdate
+from app.schemas.mobile_cart import MobileCartItemCreate, MobileCartItemUpdate, MobileCartBulkUpdate
+
+async def bulk_add_to_cart(bulk_in: MobileCartBulkUpdate) -> dict:
+    db = get_db()
+    
+    for item in bulk_in.items:
+        product_id = item.get("productId")
+        quantity = item.get("quantity", 0)
+        
+        if not product_id or quantity <= 0:
+            continue
+            
+        # Check if this item is already in the active cart
+        existing_item = await db["cart_items"].find_one({
+            "customerId": bulk_in.customerId,
+            "warehouseId": bulk_in.warehouseId,
+            "productId": product_id,
+            "is_order_place": False,
+            "is_item_removed": {"$ne": True}
+        })
+        
+        if existing_item:
+            # Update quantity (usually bulk means setting current state, but we'll assume adding here)
+            # Actually, for mobile sync, it might mean "set quantity to X"
+            # Let's assume ADDING for now, unless the user clarifies.
+            new_quantity = existing_item.get("quantity", 0) + quantity
+            await db["cart_items"].update_one(
+                {"_id": existing_item["_id"]},
+                {"$set": {"quantity": new_quantity, "is_item_added_cart": True}}
+            )
+        else:
+            # Create new
+            item_dict = {
+                "customerId": bulk_in.customerId,
+                "warehouseId": bulk_in.warehouseId,
+                "productId": product_id,
+                "quantity": quantity,
+                "is_item_added_cart": True,
+                "is_order_place": False,
+                "is_item_removed": False
+            }
+            await db["cart_items"].insert_one(item_dict)
+            
+    return await get_active_cart(bulk_in.customerId, bulk_in.warehouseId)
 
 async def add_to_cart(item_in: MobileCartItemCreate) -> dict:
     db = get_db()

@@ -1,12 +1,16 @@
 from fastapi import APIRouter, HTTPException, Query
-from app.schemas.mobile_cart import MobileCartItemCreate, MobileCartItemUpdate, MobileCartResponse, MobileCartItemResponse
-from app.crud.mobile_cart import add_to_cart, get_active_cart, remove_from_cart, update_cart_item
+from app.schemas.mobile_cart import MobileCartItemCreate, MobileCartItemUpdate, MobileCartResponse, MobileCartItemResponse, MobileCartBulkUpdate
+from app.crud.mobile_cart import add_to_cart, get_active_cart, remove_from_cart, update_cart_item, bulk_add_to_cart
 
 router = APIRouter()
 
 @router.post("/", response_model=MobileCartItemResponse)
 async def create_cart_item(item_in: MobileCartItemCreate):
     return await add_to_cart(item_in)
+
+@router.post("/bulk", response_model=MobileCartResponse)
+async def bulk_create_cart_items(bulk_in: MobileCartBulkUpdate):
+    return await bulk_add_to_cart(bulk_in)
 
 @router.get("/", response_model=MobileCartResponse)
 async def read_active_cart(
