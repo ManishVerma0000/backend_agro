@@ -121,6 +121,104 @@ async def get_customer(customer_id: str) -> Optional[dict]:
         customer["id"] = str(customer.pop("_id"))
     return customer
 
+async def get_customer_with_stats(customer_id: str) -> Optional[dict]:
+    db = get_db()
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    now = datetime.utcnow()
+
+    # Robust ID handling
+    possible_ids = [customer_id]
+    try:
+        possible_ids.append(ObjectId(customer_id))
+    except:
+        pass
+
+    pipeline = [
+        {"$match": {"_id": {"$in": possible_ids}}},
+        {
+            "$addFields": {
+                "customerObjectId": {"$toString": "$_id"}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "mobile_orders",
+                "localField": "customerObjectId",
+                "foreignField": "customerId",
+                "as": "orders"
+            }
+        },
+        {
+            "$addFields": {
+                "totalOrders": {"$size": "$orders"},
+                "totalSpent": {"$sum": "$orders.grandTotal"},
+                "lastOrderDate": {"$max": "$orders.createdAt"},
+                "thirtyDaysOrders": {
+                    "$filter": {
+                        "input": "$orders",
+                        "as": "order",
+                        "cond": {"$gte": ["$$order.createdAt", thirty_days_ago]}
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "thirtyDaysOrderValue": {"$sum": "$thirtyDaysOrders.grandTotal"},
+                "daysSinceLastOrder": {
+                    "$cond": [
+                        {"$eq": ["$lastOrderDate", None]},
+                        9999,
+                        {"$divide": [
+                            {"$subtract": [now, "$lastOrderDate"]},
+                            1000 * 60 * 60 * 24
+                        ]}
+                    ]
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "customerType": {
+                    "$switch": {
+                        "branches": [
+                            {"case": {"$eq": ["$totalOrders", 0]}, "then": "New"},
+                            {"case": {"$gte": ["$thirtyDaysOrderValue", 100000]}, "then": "High"},
+                            {"case": {"$gte": ["$thirtyDaysOrderValue", 50000]}, "then": "Medium"},
+                            {"case": {"$gte": ["$thirtyDaysOrderValue", 1500]}, "then": "Low"}
+                        ],
+                        "default": "New"
+                    }
+                },
+                "customerStatus": {
+                    "$switch": {
+                        "branches": [
+                            {"case": {"$lte": ["$daysSinceLastOrder", 3.0]}, "then": "Active"},
+                            {"case": {"$lte": ["$daysSinceLastOrder", 14.0]}, "then": "At Risk"},
+                        ],
+                        "default": "Inactive"
+                     }
+                }
+            }
+        },
+        {
+            "$project": {
+                "orders": 0,
+                "customerObjectId": 0,
+                "thirtyDaysOrders": 0,
+                "daysSinceLastOrder": 0
+            }
+        }
+    ]
+
+    cursor = db["customers"].aggregate(pipeline)
+    async for cust in cursor:
+        cust["id"] = str(cust.pop("_id"))
+        if cust.get("customerType") == "New" and cust.get("totalOrders", 0) > 0:
+            cust["customerType"] = "Low"
+        return cust
+    return None
+
 async def update_customer(customer_id: str, customer_in: CustomerUpdate) -> Optional[dict]:
     db = get_db()
     update_data = customer_in.model_dump(exclude_unset=True)

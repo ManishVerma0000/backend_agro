@@ -59,6 +59,7 @@ class CustomerUpdate(BaseModel):
 class CustomerResponse(CustomerBase):
     id: str
     createdDate: datetime
+    addresses: List[CustomerAddressResponse] = []
     
     model_config = ConfigDict(populate_by_name=True)
 

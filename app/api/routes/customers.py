@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from app.schemas.customer import CustomerResponse, CustomerCreate, CustomerAddressCreate
-from app.crud.customer import get_all_customers, create_customer, create_customer_address
+from app.crud.customer import get_all_customers, create_customer, create_customer_address, get_customer_with_stats, get_customer_addresses
 
 router = APIRouter()
 
@@ -24,6 +24,19 @@ class AdminCustomerCreate(BaseModel):
 @router.get("/", response_model=List[CustomerResponse])
 async def read_customers():
     return await get_all_customers()
+
+@router.get("/detail/{id}", response_model=CustomerResponse)
+async def read_customer(id: str):
+    print(f"DEBUG: Fetching customer with ID: {id}")
+    customer = await get_customer_with_stats(id)
+    if not customer:
+        print(f"DEBUG: Customer not found in DB: {id}")
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Enrich with addresses
+    customer["addresses"] = await get_customer_addresses(id)
+    
+    return customer
 
 @router.post("/", response_model=CustomerResponse)
 async def create_admin_customer(data: AdminCustomerCreate):
