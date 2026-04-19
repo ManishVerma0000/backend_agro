@@ -16,3 +16,4 @@ This project provides an optimal production-ready starting structure for a FastA
 1. Install dependencies: `pip install -r requirements.txt` 
 2. Create `.env` from `.env.example`
 3. Start the server: `uvicorn app.main:app --reload`
+

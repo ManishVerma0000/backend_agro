@@ -7,7 +7,11 @@ class MobileOrderCreate(BaseModel):
     warehouseId: str
     deliveryAddressId: Optional[str] = None
     paymentMethod: Optional[str] = "Cash on Delivery"
-    # The API will calculate totals directly from the cart in the database
+    # Admin Panel Fields (If provided, we skip cart fetching)
+    items: Optional[List[Any]] = None
+    subtotal: Optional[float] = None
+    deliveryFee: Optional[float] = None
+    grandTotal: Optional[float] = None
 
 class MobileOrderResponse(BaseModel):
     id: str

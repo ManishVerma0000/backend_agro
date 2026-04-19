@@ -7,38 +7,45 @@ from app.crud.mobile_cart import get_active_cart
 
 async def place_order(order_in: MobileOrderCreate) -> dict:
     db = get_db()
-    
-    # 1. Fetch the active cart to get items and totals
-    cart_data = await get_active_cart(order_in.customerId, order_in.warehouseId)
-    
-    if not cart_data["items"]:
-        raise ValueError("Cannot place an order with an empty cart")
-        
-    items = cart_data["items"]
-    item_ids = [ObjectId(item["id"]) for item in items]
-    
-    # 2. Construct the Order payload
     order_dict = order_in.model_dump()
-    order_dict["subtotal"] = cart_data["subtotal"]
-    order_dict["deliveryFee"] = cart_data["deliveryFee"]
-    order_dict["grandTotal"] = cart_data["grandTotal"]
+    
+    # 1. Check if this is a direct/admin order (items provided) or cart-based order
+    if order_in.items is not None:
+        items = order_in.items
+        subtotal = order_in.subtotal or 0
+        deliveryFee = order_in.deliveryFee or 0
+        grandTotal = order_in.grandTotal or 0
+        item_ids = [] # No cart items to update
+    else:
+        # Fetch the active cart to get items and totals
+        cart_data = await get_active_cart(order_in.customerId, order_in.warehouseId)
+        
+        if not cart_data["items"]:
+            raise ValueError("Cannot place an order with an empty cart")
+            
+        items = cart_data["items"]
+        subtotal = cart_data["subtotal"]
+        deliveryFee = cart_data["deliveryFee"]
+        grandTotal = cart_data["grandTotal"]
+        item_ids = [ObjectId(item["id"]) for item in items]
+
+    # 2. Construct the Order payload
+    order_dict["subtotal"] = subtotal
+    order_dict["deliveryFee"] = deliveryFee
+    order_dict["grandTotal"] = grandTotal
     order_dict["status"] = "Placed"
     order_dict["createdAt"] = datetime.utcnow()
-    
-    # Store the actual cart items inside the order snapshot so history doesn't break if cart item changes
     order_dict["items"] = items 
     
     # 3. Insert the order
     result = await db["mobile_orders"].insert_one(order_dict)
     
-    # 4. Update the cart items to mark them as `is_order_place = True`
-    await db["cart_items"].update_many(
-        {"_id": {"$in": item_ids}},
-        {"$set": {"is_order_place": True, "orderId": str(result.inserted_id)}}
-    )
-    
-    # 5. Inventory deduction (optional based on your inventory strategy, we'll leave it simple for now)
-    # usually here we would reduce `availableStock` on `warehouse_products`
+    # 4. Update the cart items if this was a cart-based order
+    if item_ids:
+        await db["cart_items"].update_many(
+            {"_id": {"$in": item_ids}},
+            {"$set": {"is_order_place": True, "orderId": str(result.inserted_id)}}
+        )
     
     return await get_order(str(result.inserted_id))
 
