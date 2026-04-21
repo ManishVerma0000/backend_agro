@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Any
 from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse
-from app.crud.mobile_order import place_order, get_customer_orders, get_warehouse_orders, get_order_by_id, confirm_order, start_picking, get_warehouse_orders_by_status, start_packing, ready_for_dispatch
+from app.crud.mobile_order import (
+    place_order, get_customer_orders, get_warehouse_orders, 
+    get_order_by_id, confirm_order, start_picking, 
+    get_warehouse_orders_by_status, start_packing, ready_for_dispatch, delete_order
+)
 
 router = APIRouter()
 
@@ -32,6 +36,13 @@ async def read_order(order_id: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
+
+@router.delete("/{order_id}")
+async def remove_order(order_id: str):
+    success = await delete_order(order_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"message": "Order deleted successfully"}
 
 @router.patch("/{order_id}/confirm")
 async def confirm_order_status(order_id: str):

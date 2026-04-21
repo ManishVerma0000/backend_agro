@@ -284,5 +284,13 @@ async def update_customer_address(customer_id: str, address_id: str, address_in:
 
 async def delete_customer_address(address_id: str) -> bool:
     db = get_db()
-    result = await db["customer_addresses"].delete_one({"_id": ObjectId(address_id)})
+    print(f"DEBUG: Attempting to delete address with ID: {address_id}")
+    try:
+        obj_id = ObjectId(address_id)
+    except Exception as e:
+        print(f"DEBUG: Invalid ObjectId format: {address_id}, error: {e}")
+        return False
+        
+    result = await db["customer_addresses"].delete_one({"_id": obj_id})
+    print(f"DEBUG: Delete result - matching documents deleted: {result.deleted_count}")
     return result.deleted_count > 0

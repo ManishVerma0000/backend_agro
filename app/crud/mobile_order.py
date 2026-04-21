@@ -7,47 +7,44 @@ from app.crud.mobile_cart import get_active_cart
 
 async def place_order(order_in: MobileOrderCreate) -> dict:
     db = get_db()
-    order_dict = order_in.model_dump()
+    order_dict = order_in.model_dump(exclude_unset=True)
     
-    # 1. Check if this is a direct/admin order (items provided) or cart-based order
-    if order_in.items is not None:
-        items = order_in.items
-        subtotal = order_in.subtotal or 0
-        deliveryFee = order_in.deliveryFee or 0
-        grandTotal = order_in.grandTotal or 0
-        item_ids = [] # No cart items to update
-    else:
-        # Fetch the active cart to get items and totals
-        cart_data = await get_active_cart(order_in.customerId, order_in.warehouseId)
-        
-        if not cart_data["items"]:
-            raise ValueError("Cannot place an order with an empty cart")
-            
-        items = cart_data["items"]
-        subtotal = cart_data["subtotal"]
-        deliveryFee = cart_data["deliveryFee"]
-        grandTotal = cart_data["grandTotal"]
-        item_ids = [ObjectId(item["id"]) for item in items]
+    # Unify items from either 'items' (admin) or 'cartItems' (mobile)
+    items = order_in.cartItems if order_in.cartItems is not None else order_in.items
+    
+    if not items:
+        raise ValueError("Cannot place an order without items")
 
-    # 2. Construct the Order payload
-    order_dict["subtotal"] = subtotal
-    order_dict["deliveryFee"] = deliveryFee
-    order_dict["grandTotal"] = grandTotal
+    # Handle mobile address object if provided
+    if order_in.address and isinstance(order_in.address, dict):
+        order_dict["deliveryAddress"] = order_in.address
+        if "id" in order_in.address:
+            order_dict["deliveryAddressId"] = order_in.address["id"]
+
+    # Clean up redundant keys
+    order_dict.pop("cartItems", None)
+    order_dict.pop("address", None)
+    
+    order_dict["subtotal"] = order_in.subtotal or 0
+    order_dict["deliveryFee"] = order_in.deliveryFee or 0
+    order_dict["grandTotal"] = order_in.grandTotal or 0
     order_dict["status"] = "Placed"
     order_dict["createdAt"] = datetime.utcnow()
     order_dict["items"] = items 
     
-    # 3. Insert the order
     result = await db["mobile_orders"].insert_one(order_dict)
     
-    # 4. Update the cart items if this was a cart-based order
-    if item_ids:
-        await db["cart_items"].update_many(
-            {"_id": {"$in": item_ids}},
-            {"$set": {"is_order_place": True, "orderId": str(result.inserted_id)}}
-        )
-    
     return await get_order(str(result.inserted_id))
+
+async def delete_order(order_id: str) -> bool:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return False
+        
+    result = await db["mobile_orders"].delete_one({"_id": obj_id})
+    return result.deleted_count > 0
 
 
 async def get_order(order_id: str) -> Optional[dict]:
@@ -129,7 +126,7 @@ async def get_order_by_id(order_id: str) -> Optional[dict]:
         {"$unwind": {"path": "$customer_info", "preserveNullAndEmptyArrays": True}},
         {
             "$lookup": {
-                "from": "customer_address",
+                "from": "customer_addresses",
                 "localField": "addressObjectId",
                 "foreignField": "_id",
                 "as": "address_info"
