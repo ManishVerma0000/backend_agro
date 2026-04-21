@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Any
-from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse
+from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse, MobileOrderListResponse
 from app.crud.mobile_order import (
     place_order, get_customer_orders, get_warehouse_orders, 
     get_order_by_id, confirm_order, start_picking, 
@@ -16,9 +16,13 @@ async def create_order(order_in: MobileOrderCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[MobileOrderResponse])
-async def read_past_orders(customer_id: str = Query(...)):
-    return await get_customer_orders(customer_id)
+@router.get("/", response_model=MobileOrderListResponse)
+async def read_past_orders(
+    customer_id: str = Query(...),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100)
+):
+    return await get_customer_orders(customer_id, skip, limit)
 
 # Specific warehouse routes MUST come before /{order_id} to avoid path conflicts
 @router.get("/warehouse/{warehouse_id}/by-status")

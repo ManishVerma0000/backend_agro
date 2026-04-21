@@ -20,8 +20,8 @@ class MobileOrderCreate(BaseModel):
 
 class MobileOrderResponse(BaseModel):
     id: str
-    customerId: str
-    warehouseId: str
+    customerId: Optional[str] = None
+    warehouseId: Optional[str] = None
     deliveryAddressId: Optional[str] = None
     subtotal: float
     deliveryFee: float
@@ -32,3 +32,9 @@ class MobileOrderResponse(BaseModel):
     items: List[Any] = []
     
     model_config = ConfigDict(populate_by_name=True)
+
+class MobileOrderListResponse(BaseModel):
+    items: List[MobileOrderResponse]
+    total: int
+    skip: int
+    limit: int

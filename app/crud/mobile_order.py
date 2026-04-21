@@ -55,14 +55,20 @@ async def get_order(order_id: str) -> Optional[dict]:
     return order
 
 
-async def get_customer_orders(customer_id: str) -> List[dict]:
+async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20) -> dict:
     db = get_db()
-    cursor = db["mobile_orders"].find({"customerId": customer_id}).sort("createdAt", -1)
+    total = await db["mobile_orders"].count_documents({"customerId": customer_id})
+    cursor = db["mobile_orders"].find({"customerId": customer_id}).sort("createdAt", -1).skip(skip).limit(limit)
     orders = []
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
         orders.append(order)
-    return orders
+    return {
+        "items": orders,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
     db = get_db()
