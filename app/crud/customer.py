@@ -282,7 +282,7 @@ async def update_customer_address(customer_id: str, address_id: str, address_in:
         )
     return await get_customer_address(address_id)
 
-async def delete_customer_address(customer_id: str, address_id: str) -> bool:
+async def delete_customer_address(address_id: str) -> bool:
     db = get_db()
-    result = await db["customer_addresses"].delete_one({"_id": ObjectId(address_id), "customerId": customer_id})
+    result = await db["customer_addresses"].delete_one({"_id": ObjectId(address_id)})
     return result.deleted_count > 0

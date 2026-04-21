@@ -129,7 +129,7 @@ async def get_order_by_id(order_id: str) -> Optional[dict]:
         {"$unwind": {"path": "$customer_info", "preserveNullAndEmptyArrays": True}},
         {
             "$lookup": {
-                "from": "customer_addresses",
+                "from": "customer_address",
                 "localField": "addressObjectId",
                 "foreignField": "_id",
                 "as": "address_info"

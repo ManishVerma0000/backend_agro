@@ -31,8 +31,8 @@ async def update_address(id: str, address_in: CustomerAddressUpdate, customer_id
     return updated
 
 @router.delete("/{id}")
-async def delete_address(id: str, customer_id: str):
-    success = await delete_customer_address(customer_id, id)
+async def delete_address(id: str):
+    success = await delete_customer_address(id)
     if not success:
         raise HTTPException(status_code=404, detail="Address not found")
     return {"message": "Address deleted"}
