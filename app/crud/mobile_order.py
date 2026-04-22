@@ -91,7 +91,16 @@ async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
         {
             "$addFields": {
                 "customerName": {"$ifNull": ["$customer_info.shopName", "$customer_info.ownerName", "Unknown Customer"]},
-                "location": {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+                "customerPhone": {"$ifNull": ["$customer_info.mobileNumber", "N/A"]},
+                "customerEmail": {"$ifNull": ["$customer_info.email", "N/A"]},
+                "location": {
+                    "$ifNull": [
+                        "$deliveryAddress.location",
+                        "$deliveryAddress.city",
+                        "$customer_info.city",
+                        "Unknown Location"
+                    ]
+                }
             }
         },
         {"$sort": {"createdAt": -1}},
@@ -224,7 +233,16 @@ async def get_warehouse_orders_by_status(warehouse_id: str, status: str) -> List
         {
             "$addFields": {
                 "customerName": {"$ifNull": ["$customer_info.shopName", "$customer_info.ownerName", "Unknown Customer"]},
-                "location": {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+                "customerPhone": {"$ifNull": ["$customer_info.mobileNumber", "N/A"]},
+                "customerEmail": {"$ifNull": ["$customer_info.email", "N/A"]},
+                "location": {
+                    "$ifNull": [
+                        "$deliveryAddress.location",
+                        "$deliveryAddress.city",
+                        "$customer_info.city",
+                        "Unknown Location"
+                    ]
+                }
             }
         },
         {"$sort": {"createdAt": -1}},
