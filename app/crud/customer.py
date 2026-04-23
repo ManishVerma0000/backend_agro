@@ -9,6 +9,11 @@ async def get_all_customers() -> List[dict]:
     
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     now = datetime.utcnow()
+    five_days_ago = now - timedelta(days=5)
+    three_days_ago = now - timedelta(days=3)
+    eight_days_ago = now - timedelta(days=8)
+    four_days_ago = now - timedelta(days=4)
+    fifteen_days_ago = now - timedelta(days=15)
     
     pipeline = [
         {
@@ -78,6 +83,17 @@ async def get_all_customers() -> List[dict]:
             }
         },
         {
+            "$addFields": {
+                "thirtyDaysOrderDates": {
+                    "$map": {
+                        "input": "$thirtyDaysOrders",
+                        "as": "order",
+                        "in": "$$order.createdAt"
+                    }
+                }
+            }
+        },
+        {
             "$project": {
                 "orders": 0,
                 "customerObjectId": 0,
@@ -95,6 +111,28 @@ async def get_all_customers() -> List[dict]:
         # Override the defaults if needed if it was unhandled (e.g. totalOrders > 0 but < 1500)
         if cust.get("customerType") == "New" and cust.get("totalOrders", 0) > 0:
             cust["customerType"] = "Low"
+            
+        # Compute exact customer status in python
+        thirty_days_dates = cust.pop("thirtyDaysOrderDates", [])
+        last_order_date = cust.get("lastOrderDate")
+        
+        if not last_order_date:
+            cust["customerStatus"] = "Inactive"
+        else:
+            orders_in_last_5_days = sum(1 for d in thirty_days_dates if d >= five_days_ago)
+            orders_in_last_3_days_dates = [d.date() for d in thirty_days_dates if d >= three_days_ago]
+            ordered_each_day_last_3_days = len(set(orders_in_last_3_days_dates)) >= 3
+            
+            if orders_in_last_5_days >= 3 and ordered_each_day_last_3_days:
+                cust["customerStatus"] = "Regular"
+            elif last_order_date >= three_days_ago:
+                cust["customerStatus"] = "Active"
+            elif four_days_ago >= last_order_date >= eight_days_ago:
+                cust["customerStatus"] = "At Risk"
+            elif last_order_date <= fifteen_days_ago:
+                cust["customerStatus"] = "Inactive"
+            else:
+                cust["customerStatus"] = "Inactive" # Default fallback
             
         customers.append(cust)
     return customers
@@ -125,6 +163,11 @@ async def get_customer_with_stats(customer_id: str) -> Optional[dict]:
     db = get_db()
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     now = datetime.utcnow()
+    five_days_ago = now - timedelta(days=5)
+    three_days_ago = now - timedelta(days=3)
+    eight_days_ago = now - timedelta(days=8)
+    four_days_ago = now - timedelta(days=4)
+    fifteen_days_ago = now - timedelta(days=15)
 
     # Robust ID handling
     possible_ids = [customer_id]
@@ -202,6 +245,17 @@ async def get_customer_with_stats(customer_id: str) -> Optional[dict]:
             }
         },
         {
+            "$addFields": {
+                "thirtyDaysOrderDates": {
+                    "$map": {
+                        "input": "$thirtyDaysOrders",
+                        "as": "order",
+                        "in": "$$order.createdAt"
+                    }
+                }
+            }
+        },
+        {
             "$project": {
                 "orders": 0,
                 "customerObjectId": 0,
@@ -216,6 +270,28 @@ async def get_customer_with_stats(customer_id: str) -> Optional[dict]:
         cust["id"] = str(cust.pop("_id"))
         if cust.get("customerType") == "New" and cust.get("totalOrders", 0) > 0:
             cust["customerType"] = "Low"
+            
+        thirty_days_dates = cust.pop("thirtyDaysOrderDates", [])
+        last_order_date = cust.get("lastOrderDate")
+        
+        if not last_order_date:
+            cust["customerStatus"] = "Inactive"
+        else:
+            orders_in_last_5_days = sum(1 for d in thirty_days_dates if d >= five_days_ago)
+            orders_in_last_3_days_dates = [d.date() for d in thirty_days_dates if d >= three_days_ago]
+            ordered_each_day_last_3_days = len(set(orders_in_last_3_days_dates)) >= 3
+            
+            if orders_in_last_5_days >= 3 and ordered_each_day_last_3_days:
+                cust["customerStatus"] = "Regular"
+            elif last_order_date >= three_days_ago:
+                cust["customerStatus"] = "Active"
+            elif four_days_ago >= last_order_date >= eight_days_ago:
+                cust["customerStatus"] = "At Risk"
+            elif last_order_date <= fifteen_days_ago:
+                cust["customerStatus"] = "Inactive"
+            else:
+                cust["customerStatus"] = "Inactive"
+                
         return cust
     return None
 
