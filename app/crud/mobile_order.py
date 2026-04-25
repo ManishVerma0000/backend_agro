@@ -79,8 +79,12 @@ async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20) 
         "limit": limit
     }
 
-async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
+async def get_warehouse_orders(warehouse_id: str, skip: int = 0, limit: int = 10) -> dict:
     db = get_db()
+    
+    # Count total first
+    total = await db["mobile_orders"].count_documents({"warehouseId": warehouse_id})
+    
     pipeline = [
         {"$match": {"warehouseId": warehouse_id}},
         {
@@ -113,6 +117,8 @@ async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
             }
         },
         {"$sort": {"createdAt": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
         {"$project": {"customer_info": 0, "customerObjectId": 0}}
     ]
     
@@ -121,7 +127,12 @@ async def get_warehouse_orders(warehouse_id: str) -> List[dict]:
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
         orders.append(order)
-    return orders
+    return {
+        "items": orders,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 async def get_order_by_id(order_id: str) -> Optional[dict]:
     db = get_db()

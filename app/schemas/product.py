@@ -61,3 +61,9 @@ class ProductResponse(ProductBase):
     id: str
 
     model_config = ConfigDict(populate_by_name=True)
+
+class ProductListResponse(BaseModel):
+    items: List[ProductResponse]
+    total: int
+    skip: int
+    limit: int

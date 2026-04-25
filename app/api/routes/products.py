@@ -1,14 +1,15 @@
-from fastapi import APIRouter, HTTPException, status
-from typing import List
-from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
+from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductListResponse
+from fastapi import APIRouter, HTTPException, status, Query
 from app.crud import product as crud_product
 
 router = APIRouter()
 
-@router.get("/", response_model=List[ProductResponse])
-async def read_products():
-    products = await crud_product.get_products()
-    return products
+@router.get("/", response_model=ProductListResponse)
+async def read_products(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100)
+):
+    return await crud_product.get_products(skip, limit)
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(product_in: ProductCreate):

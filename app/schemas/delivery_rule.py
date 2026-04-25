@@ -3,11 +3,12 @@ from typing import Optional
 from datetime import datetime
 
 class DeliveryRuleBase(BaseModel):
-    ruleName: str
-    minOrderValue: float
-    maxOrderValue: Optional[float] = None
-    deliveryCharge: float
+    ruleName: Optional[str] = None
+    minOrderValue: Optional[float] = None
+    deliveryCharge: Optional[float] = None
     isFreeDelivery: bool = False
+    bannerUrl: Optional[str] = None
+    warehouseId: Optional[str] = None
     status: str = "Active"
 
 class DeliveryRuleCreate(DeliveryRuleBase):
@@ -16,9 +17,10 @@ class DeliveryRuleCreate(DeliveryRuleBase):
 class DeliveryRuleUpdate(BaseModel):
     ruleName: Optional[str] = None
     minOrderValue: Optional[float] = None
-    maxOrderValue: Optional[float] = None
     deliveryCharge: Optional[float] = None
     isFreeDelivery: Optional[bool] = None
+    bannerUrl: Optional[str] = None
+    warehouseId: Optional[str] = None
     status: Optional[str] = None
 
 class DeliveryRuleResponse(DeliveryRuleBase):

@@ -31,8 +31,12 @@ async def read_orders_by_status(warehouse_id: str, status: str = Query(...)):
     return orders
 
 @router.get("/warehouse/{warehouse_id}")
-async def read_warehouse_orders(warehouse_id: str):
-    return await get_warehouse_orders(warehouse_id)
+async def read_warehouse_orders(
+    warehouse_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100)
+):
+    return await get_warehouse_orders(warehouse_id, skip, limit)
 
 @router.get("/{order_id}")
 async def read_order(order_id: str):

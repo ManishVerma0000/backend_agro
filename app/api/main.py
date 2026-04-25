@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.routes import users, auth, upload, categories, subcategories, products, warehouses, orders, dashboard, inventory, procurement, warehouse_products, stock_action, inventory_movements, mobile_auth, mobile_address, mobile, mobile_cart, mobile_order, wms_customers, customers, utils, delivery_rules, offers
+from app.api.routes import dispatch as dispatch_module
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -20,6 +21,7 @@ api_router.include_router(wms_customers.router, prefix="/wms-customers", tags=["
 api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
 api_router.include_router(delivery_rules.router, prefix="/delivery-rules", tags=["delivery-rules"])
 api_router.include_router(offers.router, prefix="/offers", tags=["offers"])
+api_router.include_router(dispatch_module.router, prefix="/dispatch", tags=["dispatch"])
 
 # Mobile App Routes
 api_router.include_router(mobile_auth.router, prefix="/mobile/auth", tags=["mobile-auth"])

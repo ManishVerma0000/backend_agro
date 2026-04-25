@@ -5,13 +5,13 @@ class WarehouseBase(BaseModel):
     name: str
     overheadCost: float = 0.0
     logisticCost: float = 0.0
-    manager: str
-    contact: str
-    location: str
-    email: str
-    state: str
-    city: str
-    pinCode: str
+    manager: Optional[str] = None
+    contact: Optional[str] = None
+    location: Optional[str] = None
+    email: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pinCode: Optional[str] = None
     gstNo: str = ""
     fssaiNo: str = ""
     openTime: str = ""
@@ -20,8 +20,8 @@ class WarehouseBase(BaseModel):
     latitudeLink: str = ""
     images: list[str] = []
     documents: list[str] = []
-    status: str
-    createdDate: str
+    status: str = "Active"
+    createdDate: Optional[str] = None
 
 class WarehouseCreate(WarehouseBase):
     pass

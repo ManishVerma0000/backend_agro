@@ -13,11 +13,28 @@ router = APIRouter()
 
 @router.post("/", response_model=DeliveryRuleResponse)
 async def create_rule(rule: DeliveryRuleCreate):
+    if rule.isFreeDelivery:
+        existing_rules = await get_all_delivery_rules()
+        if any(r.get("isFreeDelivery") for r in existing_rules):
+            raise HTTPException(status_code=400, detail="A free delivery rule already exists.")
     return await create_delivery_rule(rule)
 
 @router.get("/", response_model=List[DeliveryRuleResponse])
 async def get_rules():
     return await get_all_delivery_rules()
+
+@router.get("/free-delivery", response_model=DeliveryRuleResponse)
+async def get_free_delivery_rule():
+    existing_rules = await get_all_delivery_rules()
+    for rule in existing_rules:
+        if rule.get("isFreeDelivery"):
+            return rule
+    raise HTTPException(status_code=404, detail="No free delivery rule found.")
+
+@router.get("/warehouse/{warehouse_id}", response_model=List[DeliveryRuleResponse])
+async def get_rules_by_warehouse(warehouse_id: str):
+    all_rules = await get_all_delivery_rules()
+    return [r for r in all_rules if r.get("warehouseId") == warehouse_id]
 
 @router.get("/{id}", response_model=DeliveryRuleResponse)
 async def get_rule(id: str):
@@ -28,6 +45,10 @@ async def get_rule(id: str):
 
 @router.put("/{id}", response_model=DeliveryRuleResponse)
 async def update_rule(id: str, rule: DeliveryRuleUpdate):
+    if rule.isFreeDelivery:
+        existing_rules = await get_all_delivery_rules()
+        if any(r.get("isFreeDelivery") and r.get("id") != id for r in existing_rules):
+            raise HTTPException(status_code=400, detail="A free delivery rule already exists.")
     updated_rule = await update_delivery_rule(id, rule)
     if not updated_rule:
         raise HTTPException(status_code=404, detail="Rule not found")

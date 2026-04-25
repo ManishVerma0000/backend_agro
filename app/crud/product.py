@@ -3,10 +3,15 @@ from bson import ObjectId
 from app.db.session import get_db
 from app.schemas.product import ProductCreate, ProductUpdate
 
-async def get_products() -> List[dict]:
+async def get_products(skip: int = 0, limit: int = 10) -> dict:
     db = get_db()
     
+    total = await db["products"].count_documents({})
+    
     pipeline = [
+        {"$sort": {"createdAt": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
         {
             "$addFields": {
                 "categoryObjectId": {"$toObjectId": "$categoryId"}
@@ -44,7 +49,13 @@ async def get_products() -> List[dict]:
     async for prod in cursor:
         prod["id"] = str(prod.pop("_id"))
         products.append(prod)
-    return products
+        
+    return {
+        "items": products,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 async def get_product(product_id: str) -> Optional[dict]:
     db = get_db()
