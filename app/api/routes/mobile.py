@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query, Depends
 from typing import List, Optional
 from app.schemas.mobile import MobileProductResponse, MobileHomeResponse, MobileCategoryFull
 from app.crud.mobile import get_mobile_home, get_mobile_products, get_mobile_categories
+from app.services.offer_logic import get_applicable_offer
 
 router = APIRouter()
 
@@ -41,3 +42,8 @@ async def read_mobile_product_details(
 @router.get("/categories", response_model=List[MobileCategoryFull])
 async def read_mobile_categories():
     return await get_mobile_categories()
+
+@router.get("/offers")
+async def read_mobile_offers(customer_id: str = Query(...), cart_value: float = Query(0)):
+    offer = await get_applicable_offer(customer_id, cart_value)
+    return {"offer": offer}

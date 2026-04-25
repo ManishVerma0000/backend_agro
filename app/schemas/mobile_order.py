@@ -17,6 +17,7 @@ class MobileOrderCreate(BaseModel):
     deliveryFee: Optional[float] = None
     grandTotal: Optional[float] = None
     selectedDeliveryTime: Optional[str] = None
+    offerId: Optional[str] = None
 
 class MobileOrderResponse(BaseModel):
     id: str
@@ -29,6 +30,7 @@ class MobileOrderResponse(BaseModel):
     paymentMethod: str
     status: str
     createdAt: datetime
+    offerId: Optional[str] = None
     items: List[Any] = []
     
     model_config = ConfigDict(populate_by_name=True)

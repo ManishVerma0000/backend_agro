@@ -34,6 +34,15 @@ async def place_order(order_in: MobileOrderCreate) -> dict:
     
     result = await db["mobile_orders"].insert_one(order_dict)
     
+    # Record offer usage if present
+    if order_in.offerId:
+        await db["offer_usage"].insert_one({
+            "offerId": order_in.offerId,
+            "customerId": order_in.customerId,
+            "orderId": str(result.inserted_id),
+            "createdAt": datetime.utcnow()
+        })
+    
     return await get_order(str(result.inserted_id))
 
 async def delete_order(order_id: str) -> bool:
