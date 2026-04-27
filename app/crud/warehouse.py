@@ -3,6 +3,18 @@ from bson import ObjectId
 from app.db.session import get_db
 from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
 
+def _update_geo_field(w_dict: dict):
+    lat_link = w_dict.get("latitudeLink")
+    if lat_link and "," in lat_link:
+        try:
+            parts = lat_link.split(",")
+            if len(parts) >= 2:
+                lat = float(parts[0].strip())
+                lon = float(parts[1].strip())
+                w_dict["location_geo"] = {"type": "Point", "coordinates": [lon, lat]}
+        except:
+            pass
+
 async def get_warehouses() -> List[dict]:
     db = get_db()
     cursor = db["warehouses"].find()
@@ -31,6 +43,9 @@ async def create_warehouse(warehouse_in: WarehouseCreate) -> dict:
     with open("warehouse_debug.txt", "a") as f:
         f.write(f"CREATE DATA: {w_dict}\n")
     
+    # Update geo field if latitudeLink is present
+    _update_geo_field(w_dict)
+    
     result = await db["warehouses"].insert_one(w_dict)
     return await get_warehouse(str(result.inserted_id))
 
@@ -47,6 +62,10 @@ async def update_warehouse(warehouse_id: str, warehouse_in: WarehouseUpdate) -> 
             update_data["overheadCost"] = float(update_data["overheadCost"])
         if "logisticCost" in update_data and update_data["logisticCost"] is not None:
             update_data["logisticCost"] = float(update_data["logisticCost"])
+            
+        # Update geo field if latitudeLink is being updated
+        if "latitudeLink" in update_data:
+            _update_geo_field(update_data)
             
         await db["warehouses"].update_one(
             {"_id": ObjectId(warehouse_id)},

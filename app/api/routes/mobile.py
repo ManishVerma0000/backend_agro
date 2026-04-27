@@ -47,3 +47,12 @@ async def read_mobile_categories():
 async def read_mobile_offers(customer_id: str = Query(...), cart_value: float = Query(0)):
     offer = await get_applicable_offer(customer_id, cart_value)
     return {"offer": offer}
+
+@router.get("/nearest-warehouse")
+async def read_nearest_warehouse(lat: float = Query(...), lon: float = Query(...)):
+    from app.crud.mobile import get_nearest_warehouse
+    warehouse = await get_nearest_warehouse(lat, lon)
+    if not warehouse:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="No active warehouse found near this location")
+    return warehouse

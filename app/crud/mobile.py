@@ -306,3 +306,32 @@ async def get_mobile_categories() -> List[dict]:
         categories.append(cat)
         
     return categories
+
+async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
+    db = get_db()
+    
+    # Use MongoDB $geoNear to find the nearest warehouse and calculate distance
+    pipeline = [
+        {
+            "$geoNear": {
+                "near": {"type": "Point", "coordinates": [lon, lat]},
+                "distanceField": "distance", # Distance in meters
+                "spherical": True,
+                "query": {"status": "Active"},
+                "maxDistance": 10000 # 10km limit in meters
+            }
+        },
+        {"$limit": 1}
+    ]
+    
+    cursor = db["warehouses"].aggregate(pipeline)
+    
+    warehouses = []
+    async for w in cursor:
+        w["id"] = str(w.pop("_id"))
+        # Convert distance to km for better readability
+        if "distance" in w:
+            w["distance_km"] = round(w["distance"] / 1000, 2)
+        warehouses.append(w)
+        
+    return warehouses[0] if warehouses else None
