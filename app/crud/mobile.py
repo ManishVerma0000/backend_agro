@@ -335,3 +335,58 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
         warehouses.append(w)
         
     return warehouses[0] if warehouses else None
+
+async def get_today_price_list(warehouse_id: str, customer_id: Optional[str] = None) -> List[dict]:
+    db = get_db()
+    
+    product_ids = []
+    
+    # 1. Try to get products from the last order if customer_id is provided
+    if customer_id and customer_id != "undefined":
+        last_order = await db["mobile_orders"].find_one(
+            {"customerId": customer_id, "warehouseId": warehouse_id},
+            sort=[("createdAt", -1)]
+        )
+        if last_order and "items" in last_order:
+            for item in last_order["items"]:
+                if "productId" in item:
+                    product_ids.append(item["productId"])
+    
+    # 2. If no products from orders, get most sold items in the warehouse
+    if not product_ids:
+        pipeline = [
+            {"$match": {"warehouseId": warehouse_id}},
+            {"$unwind": "$items"},
+            {"$group": {"_id": "$items.productId", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        cursor = db["mobile_orders"].aggregate(pipeline)
+        async for doc in cursor:
+            product_ids.append(doc["_id"])
+            
+    # 3. Fallback: If still no products, just get top products from warehouse_products
+    if not product_ids:
+        cursor = db["warehouse_products"].find({"warehouseId": warehouse_id, "status": "Active"}).limit(10)
+        async for wp in cursor:
+            product_ids.append(wp["productId"])
+            
+    # Deduplicate product IDs while preserving order
+    unique_product_ids = []
+    seen = set()
+    for pid in product_ids:
+        if pid not in seen:
+            unique_product_ids.append(pid)
+            seen.add(pid)
+    unique_product_ids = unique_product_ids[:10]
+            
+    # 4. Fetch full details for these product IDs
+    # Since we have get_mobile_products, we can adapt it or just call it and filter
+    # But for better performance, we'll fetch them individually for now or use a batch approach if possible.
+    results = []
+    for pid in unique_product_ids:
+        p_details = await get_mobile_product_details(warehouse_id, pid)
+        if p_details:
+            results.append(p_details)
+            
+    return results

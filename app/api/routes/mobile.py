@@ -56,3 +56,11 @@ async def read_nearest_warehouse(lat: float = Query(...), lon: float = Query(...
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="No active warehouse found near this location")
     return warehouse
+
+@router.get("/today-price-list")
+async def read_today_price_list(
+    warehouse_id: str = Query(...),
+    customer_id: Optional[str] = Query(None)
+):
+    from app.crud.mobile import get_today_price_list
+    return await get_today_price_list(warehouse_id, customer_id)
