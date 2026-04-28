@@ -313,7 +313,7 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
     db = get_db()
     api_key = os.getenv("GOOGLE_MAP_KEY")
     
-    # Use MongoDB $geoNear as an initial fast filter (e.g., within 15km straight line)
+    # Use MongoDB $geoNear as an initial fast filter
     # Straight-line distance is always less than or equal to road distance.
     pipeline = [
         {
@@ -322,7 +322,7 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
                 "distanceField": "distance", # Straight-line distance in meters
                 "spherical": True,
                 "query": {"status": "Active"},
-                "maxDistance": 15000 # 15km buffer to find candidates for road distance check
+                "maxDistance": 10000 # Strictly 10km straight-line limit
             }
         },
         {"$limit": 1}
@@ -339,9 +339,7 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
         
     # If we have a Google Maps key, calculate accurate road distance
     if api_key:
-        # Warehouse location is stored as [lon, lat] in GeoJSON
         dest_lon, dest_lat = warehouse["location_geo"]["coordinates"]
-        
         road_info = await get_road_distance(lat, lon, dest_lat, dest_lon, api_key)
         
         if road_info:
@@ -350,20 +348,14 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
             if road_distance > 10000:
                 return None
             
-            # Update warehouse object with road distance info
             warehouse["distance"] = road_distance
             warehouse["distance_text"] = road_info["distance_text"]
             warehouse["duration_text"] = road_info["duration_text"]
             warehouse["distance_km"] = round(road_distance / 1000, 2)
         else:
-            # Fallback to straight-line distance if Google Maps fails
-            if warehouse["distance"] > 10000:
-                return None
+            # Fallback to straight-line
             warehouse["distance_km"] = round(warehouse["distance"] / 1000, 2)
     else:
-        # No API key, fallback to straight-line distance
-        if warehouse["distance"] > 10000:
-            return None
         warehouse["distance_km"] = round(warehouse["distance"] / 1000, 2)
         
     warehouse["id"] = str(warehouse.pop("_id"))
