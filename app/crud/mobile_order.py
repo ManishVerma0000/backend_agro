@@ -304,7 +304,7 @@ async def ready_for_dispatch(order_id: str) -> Optional[dict]:
 
     result = await db["mobile_orders"].update_one(
         {"_id": obj_id},
-        {"$set": {"status": "Ready for Dispatch"}}
+        {"$set": {"status": ""}}
     )
 
     if result.matched_count == 0:

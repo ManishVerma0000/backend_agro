@@ -44,3 +44,29 @@ async def resolve_google_maps_url(url: str) -> Dict[str, Any]:
         result["place_name"] = unquote(place_match.group(1).replace('+', ' '))
 
     return result
+
+async def get_road_distance(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float, api_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Get road distance and duration using Google Maps Distance Matrix API.
+    Returns distance in meters and duration in seconds.
+    """
+    url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origin_lat},{origin_lng}&destinations={dest_lat},{dest_lng}&key={api_key}"
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(url)
+            data = response.json()
+            
+            if data.get("status") == "OK":
+                element = data["rows"][0]["elements"][0]
+                if element.get("status") == "OK":
+                    return {
+                        "distance_meters": element["distance"]["value"],
+                        "duration_seconds": element["duration"]["value"],
+                        "distance_text": element["distance"]["text"],
+                        "duration_text": element["duration"]["text"]
+                    }
+        except Exception as e:
+            print(f"Error calling Google Maps API: {str(e)}")
+            
+    return None

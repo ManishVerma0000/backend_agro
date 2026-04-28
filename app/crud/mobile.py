@@ -1,6 +1,8 @@
 from typing import List, Optional
 from bson import ObjectId
 from app.db.session import get_db
+import os
+from app.utils.gmaps import get_road_distance
 
 async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = None, subcategory_id: Optional[str] = None, search: Optional[str] = None) -> List[dict]:
     db = get_db()
@@ -309,32 +311,63 @@ async def get_mobile_categories() -> List[dict]:
 
 async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
     db = get_db()
+    api_key = os.getenv("GOOGLE_MAP_KEY")
     
-    # Use MongoDB $geoNear to find the nearest warehouse and calculate distance
+    # Use MongoDB $geoNear as an initial fast filter (e.g., within 15km straight line)
+    # Straight-line distance is always less than or equal to road distance.
     pipeline = [
         {
             "$geoNear": {
                 "near": {"type": "Point", "coordinates": [lon, lat]},
-                "distanceField": "distance", # Distance in meters
+                "distanceField": "distance", # Straight-line distance in meters
                 "spherical": True,
                 "query": {"status": "Active"},
-                "maxDistance": 10000 # 10km limit in meters
+                "maxDistance": 15000 # 15km buffer to find candidates for road distance check
             }
         },
         {"$limit": 1}
     ]
     
     cursor = db["warehouses"].aggregate(pipeline)
-    
-    warehouses = []
+    warehouse = None
     async for w in cursor:
-        w["id"] = str(w.pop("_id"))
-        # Convert distance to km for better readability
-        if "distance" in w:
-            w["distance_km"] = round(w["distance"] / 1000, 2)
-        warehouses.append(w)
+        warehouse = w
+        break
         
-    return warehouses[0] if warehouses else None
+    if not warehouse:
+        return None
+        
+    # If we have a Google Maps key, calculate accurate road distance
+    if api_key:
+        # Warehouse location is stored as [lon, lat] in GeoJSON
+        dest_lon, dest_lat = warehouse["location_geo"]["coordinates"]
+        
+        road_info = await get_road_distance(lat, lon, dest_lat, dest_lon, api_key)
+        
+        if road_info:
+            road_distance = road_info["distance_meters"]
+            # Enforce 10km ROAD distance limit
+            if road_distance > 10000:
+                return None
+            
+            # Update warehouse object with road distance info
+            warehouse["distance"] = road_distance
+            warehouse["distance_text"] = road_info["distance_text"]
+            warehouse["duration_text"] = road_info["duration_text"]
+            warehouse["distance_km"] = round(road_distance / 1000, 2)
+        else:
+            # Fallback to straight-line distance if Google Maps fails
+            if warehouse["distance"] > 10000:
+                return None
+            warehouse["distance_km"] = round(warehouse["distance"] / 1000, 2)
+    else:
+        # No API key, fallback to straight-line distance
+        if warehouse["distance"] > 10000:
+            return None
+        warehouse["distance_km"] = round(warehouse["distance"] / 1000, 2)
+        
+    warehouse["id"] = str(warehouse.pop("_id"))
+    return warehouse
 
 async def get_today_price_list(warehouse_id: str, customer_id: Optional[str] = None) -> List[dict]:
     db = get_db()
