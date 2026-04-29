@@ -322,7 +322,7 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
                 "distanceField": "distance", # Straight-line distance in meters
                 "spherical": True,
                 "query": {"status": "Active"},
-                "maxDistance": 10000 # Strictly 10km straight-line limit
+                "maxDistance": 100000 # Strictly 100km straight-line limit
             }
         },
         {"$limit": 1}
@@ -344,8 +344,8 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
         
         if road_info:
             road_distance = road_info["distance_meters"]
-            # Enforce 10km ROAD distance limit
-            if road_distance > 10000:
+            # Enforce 100km ROAD distance limit
+            if road_distance > 100000:
                 return None
             
             warehouse["distance"] = road_distance
