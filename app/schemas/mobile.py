@@ -54,3 +54,9 @@ class MobileHomeResponse(BaseModel):
     banners: List[MobileBanner]
     categories: List[MobileCategory]
     quickOrders: List[MobileProductResponse]
+
+class MobileCategoryWithProducts(BaseModel):
+    id: str
+    name: str
+    imageUrl: Optional[str] = None
+    products: List[MobileProductResponse] = []

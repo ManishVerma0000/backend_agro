@@ -125,11 +125,17 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
     db = get_db()
     
     try:
-        # We will match either the warehouse_product _id OR the global productId
-        obj_id = ObjectId(product_id) if len(product_id) == 24 else None
-        product_id_query = {"$or": [{"productId": product_id}, {"_id": obj_id}]} if obj_id else {"productId": product_id}
+        # Handle both string and ObjectId inputs
+        if isinstance(product_id, ObjectId):
+            obj_id = product_id
+            product_id_str = str(product_id)
+        else:
+            obj_id = ObjectId(product_id) if len(product_id) == 24 else None
+            product_id_str = product_id
+            
+        product_id_query = {"$or": [{"productId": product_id_str}, {"_id": obj_id}]} if obj_id else {"productId": product_id_str}
     except:
-        product_id_query = {"productId": product_id}
+        product_id_query = {"productId": str(product_id)}
 
     match_query = {
         "warehouseId": warehouse_id,
@@ -232,7 +238,7 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
         
     return products[0] if products else None
 
-async def get_mobile_home(warehouse_id: str) -> dict:
+async def get_mobile_home(warehouse_id: str, customer_id: Optional[str] = None) -> dict:
     db = get_db()
     
     # 1. Fetch Categories
@@ -254,11 +260,9 @@ async def get_mobile_home(warehouse_id: str) -> dict:
         }
     ]
     
-    # 3. Fetch Quick Orders (Top Products from Warehouse)
-    # We'll just fetch the first 10 active products in the warehouse
-    quick_orders = await get_mobile_products(warehouse_id)
-    # limit in-memory for simplicity
-    quick_orders = quick_orders[:10]
+    # 3. Fetch Quick Orders (Personalized Today Price List)
+    # This internally handles the New vs Old customer logic
+    quick_orders = await get_today_price_list(warehouse_id, customer_id)
     
     return {
         "banners": banners,
@@ -363,47 +367,82 @@ async def get_nearest_warehouse(lat: float, lon: float) -> Optional[dict]:
 
 async def get_today_price_list(warehouse_id: str, customer_id: Optional[str] = None) -> List[dict]:
     db = get_db()
-    
     product_ids = []
     
-    # 1. Try to get products from the last order if customer_id is provided
+    # Define match queries for Warehouse (handles string vs ObjectId)
+    try:
+        w_obj_id = ObjectId(warehouse_id) if len(warehouse_id) == 24 else None
+    except:
+        w_obj_id = None
+    warehouse_match_query = {"$or": [{"warehouseId": warehouse_id}, {"warehouseId": w_obj_id}]} if w_obj_id else {"warehouseId": warehouse_id}
+
+    # Check if the customer has any previous orders to determine if they are "Old"
+    is_old_customer = False
+    customer_match_query = None
     if customer_id and customer_id != "undefined":
+        try:
+            cust_obj_id = ObjectId(customer_id) if len(customer_id) == 24 else None
+        except:
+            cust_obj_id = None
+            
+        customer_match_query = {"$or": [{"customerId": customer_id}, {"customerId": cust_obj_id}]} if cust_obj_id else {"customerId": customer_id}
+        order_count = await db["mobile_orders"].count_documents(customer_match_query)
+        if order_count > 0:
+            is_old_customer = True
+        else:
+            # Even if no orders found, keep the query for later use if needed
+            pass
+
+    if is_old_customer:
+        # 1. Last Order Products
         last_order = await db["mobile_orders"].find_one(
-            {"customerId": customer_id, "warehouseId": warehouse_id},
+            customer_match_query,
             sort=[("createdAt", -1)]
         )
         if last_order and "items" in last_order:
             for item in last_order["items"]:
                 if "productId" in item:
                     product_ids.append(item["productId"])
-    
-    # 2. If no products from orders, get most sold items in the warehouse
-    if not product_ids:
-        pipeline = [
-            {"$match": {"warehouseId": warehouse_id}},
+        
+        # 2. Frequently Bought Products (Top 10 most ordered products by this customer)
+        frequent_pipeline = [
+            {"$match": customer_match_query},
             {"$unwind": "$items"},
             {"$group": {"_id": "$items.productId", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        cursor = db["mobile_orders"].aggregate(pipeline)
-        async for doc in cursor:
+        frequent_cursor = db["mobile_orders"].aggregate(frequent_pipeline)
+        async for doc in frequent_cursor:
+            product_ids.append(doc["_id"])
+    else:
+        # New Customer or Anonymous: Popular items in the current region (Warehouse)
+        # Sort by total order frequency across all customers in this warehouse
+        popular_pipeline = [
+            {"$match": warehouse_match_query},
+            {"$unwind": "$items"},
+            {"$group": {"_id": "$items.productId", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 15}
+        ]
+        popular_cursor = db["mobile_orders"].aggregate(popular_pipeline)
+        async for doc in popular_cursor:
             product_ids.append(doc["_id"])
             
-    # 3. Fallback: If still no products, just get top products from warehouse_products
+    # 3. Fallback: If still no products (e.g. brand new warehouse), get top products from warehouse_products
     if not product_ids:
-        cursor = db["warehouse_products"].find({"warehouseId": warehouse_id, "status": "Active"}).limit(10)
+        cursor = db["warehouse_products"].find({**warehouse_match_query, "status": "Active"}).limit(10)
         async for wp in cursor:
             product_ids.append(wp["productId"])
             
-    # Deduplicate product IDs while preserving order
+    # Deduplicate product IDs while preserving order and limit to a reasonable number
     unique_product_ids = []
     seen = set()
     for pid in product_ids:
         if pid not in seen:
             unique_product_ids.append(pid)
             seen.add(pid)
-    unique_product_ids = unique_product_ids[:10]
+    unique_product_ids = unique_product_ids[:15]
             
     # 4. Fetch full details for these product IDs
     # Since we have get_mobile_products, we can adapt it or just call it and filter
@@ -415,3 +454,21 @@ async def get_today_price_list(warehouse_id: str, customer_id: Optional[str] = N
             results.append(p_details)
             
     return results
+
+async def get_categories_with_products(warehouse_id: str) -> List[dict]:
+    db = get_db()
+    
+    # 1. Fetch all active categories
+    categories_cursor = db["categories"].find({"status": "Active"}).sort("priority", 1)
+    categories = []
+    async for cat in categories_cursor:
+        cat_id = str(cat.pop("_id"))
+        cat["id"] = cat_id
+        
+        # 2. Fetch products for this category in the specified warehouse
+        # We use get_mobile_products which handles the complex lookups and filtering
+        cat["products"] = await get_mobile_products(warehouse_id, category_id=cat_id)
+        
+        categories.append(cat)
+        
+    return categories

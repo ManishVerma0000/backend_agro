@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Query, Depends
 from typing import List, Optional
-from app.schemas.mobile import MobileProductResponse, MobileHomeResponse, MobileCategoryFull
-from app.crud.mobile import get_mobile_home, get_mobile_products, get_mobile_categories
+from app.schemas.mobile import MobileProductResponse, MobileHomeResponse, MobileCategoryFull, MobileCategoryWithProducts
+from app.crud.mobile import get_mobile_home, get_mobile_products, get_mobile_categories, get_categories_with_products
 from app.services.offer_logic import get_applicable_offer
 
 router = APIRouter()
 
 @router.get("/home", response_model=MobileHomeResponse)
-async def read_mobile_home(warehouse_id: str = Query(...)):
-    return await get_mobile_home(warehouse_id)
+async def read_mobile_home(
+    warehouse_id: str = Query(...),
+    customer_id: Optional[str] = Query(None)
+):
+    return await get_mobile_home(warehouse_id, customer_id)
 
 @router.get("/products", response_model=List[MobileProductResponse])
 async def read_mobile_products(
@@ -42,6 +45,10 @@ async def read_mobile_product_details(
 @router.get("/categories", response_model=List[MobileCategoryFull])
 async def read_mobile_categories():
     return await get_mobile_categories()
+
+@router.get("/categories-with-products", response_model=List[MobileCategoryWithProducts])
+async def read_categories_with_products(warehouse_id: str = Query(...)):
+    return await get_categories_with_products(warehouse_id)
 
 @router.get("/offers")
 async def read_mobile_offers(customer_id: str = Query(...), cart_value: float = Query(0)):
