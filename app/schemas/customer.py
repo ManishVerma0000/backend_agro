@@ -56,6 +56,11 @@ class CustomerUpdate(BaseModel):
     aadharCardBack: Optional[str] = None
     status: Optional[str] = None
 
+class CustomerProfileUpdate(BaseModel):
+    shopName: Optional[str] = None
+    ownerName: Optional[str] = None
+    mobileNumber: Optional[str] = None
+
 class CustomerResponse(CustomerBase):
     id: str
     createdDate: datetime

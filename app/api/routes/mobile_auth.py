@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Form, File, UploadFile
 from typing import Any, Optional
-from app.schemas.customer import SendOtpRequest, VerifyOtpRequest, CustomerResponse, CustomerCreate, CustomerUpdate
+from app.schemas.customer import SendOtpRequest, VerifyOtpRequest, CustomerResponse, CustomerCreate, CustomerUpdate, CustomerProfileUpdate
 from app.crud.customer import create_customer, get_customer_by_mobile, update_customer, get_customer
 from app.core.security import create_access_token
 from app.services.s3_service import upload_image_to_s3
@@ -119,3 +119,21 @@ async def update_profile(
         "message": "Profile updated successfully",
         "customer": updated_customer
     }
+
+@router.put("/edit-profile/{customer_id}", response_model=Any)
+async def mobile_edit_profile(
+    customer_id: str,
+    profile_update: CustomerProfileUpdate
+):
+    existing = await get_customer(customer_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Customer not found")
+        
+    update_request = CustomerUpdate(**profile_update.model_dump(exclude_unset=True))
+    updated_customer = await update_customer(customer_id, update_request)
+    
+    return {
+        "message": "Profile updated successfully",
+        "customer": updated_customer
+    }
+
