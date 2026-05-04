@@ -1,6 +1,6 @@
 from typing import List, Optional
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.schemas.mobile_order import MobileOrderCreate
 from app.crud.mobile_cart import get_active_cart
@@ -64,10 +64,16 @@ async def get_order(order_id: str) -> Optional[dict]:
     return order
 
 
-async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20) -> dict:
+async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20, days: Optional[int] = None) -> dict:
     db = get_db()
-    total = await db["mobile_orders"].count_documents({"customerId": customer_id})
-    cursor = db["mobile_orders"].find({"customerId": customer_id}).sort("createdAt", -1).skip(skip).limit(limit)
+    query = {"customerId": customer_id}
+    
+    if days is not None:
+        date_threshold = datetime.utcnow() - timedelta(days=days)
+        query["createdAt"] = {"$gte": date_threshold}
+        
+    total = await db["mobile_orders"].count_documents(query)
+    cursor = db["mobile_orders"].find(query).sort("createdAt", -1).skip(skip).limit(limit)
     orders = []
     async for order in cursor:
         order["id"] = str(order.pop("_id"))

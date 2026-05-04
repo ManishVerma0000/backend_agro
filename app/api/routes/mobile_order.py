@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Any
+from typing import List, Any, Optional
 from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse, MobileOrderListResponse
 from app.crud.mobile_order import (
     place_order, get_customer_orders, get_warehouse_orders, 
@@ -20,9 +20,10 @@ async def create_order(order_in: MobileOrderCreate):
 async def read_past_orders(
     customer_id: str = Query(...),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100)
+    limit: int = Query(20, ge=1, le=100),
+    days: Optional[int] = Query(None, ge=1)
 ):
-    return await get_customer_orders(customer_id, skip, limit)
+    return await get_customer_orders(customer_id, skip, limit, days)
 
 # Specific warehouse routes MUST come before /{order_id} to avoid path conflicts
 @router.get("/warehouse/{warehouse_id}/by-status")
