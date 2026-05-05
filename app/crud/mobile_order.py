@@ -31,6 +31,9 @@ async def place_order(order_in: MobileOrderCreate) -> dict:
     order_dict["status"] = "Placed"
     order_dict["createdAt"] = datetime.utcnow()
     order_dict["items"] = items 
+    if "paymentStatus" not in order_dict:
+        order_dict["paymentStatus"] = None
+    
     
     result = await db["mobile_orders"].insert_one(order_dict)
     

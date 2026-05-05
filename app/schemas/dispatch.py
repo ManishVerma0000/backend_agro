@@ -22,5 +22,6 @@ class DispatchUpdate(BaseModel):
 class DispatchResponse(DispatchBase):
     id: str
     dispatchId: str
+    orderCount: Optional[int] = None
     createdAt: datetime
     dispatchTime: Optional[datetime] = None

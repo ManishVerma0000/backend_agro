@@ -12,8 +12,8 @@ class WarehouseBase(BaseModel):
     state: Optional[str] = None
     city: Optional[str] = None
     pinCode: Optional[str] = None
-    gstNo: str = ""
-    fssaiNo: str = ""
+    gstNo: Optional[str] = None
+    fssaiNo: Optional[str] = None
     openTime: str = ""
     closeTime: str = ""
     gstOwner: str = ""

@@ -8,6 +8,7 @@ class MobileOrderCreate(BaseModel):
     deliveryAddressId: Optional[str] = None
     address: Optional[Any] = None
     paymentMethod: Optional[str] = "Cash on Delivery"
+    paymentStatus: Optional[str] = None
     
     # Items
     items: Optional[List[Any]] = None
@@ -28,6 +29,7 @@ class MobileOrderResponse(BaseModel):
     deliveryFee: float
     grandTotal: float
     paymentMethod: str
+    paymentStatus: Optional[str] = None
     status: str
     createdAt: datetime
     offerId: Optional[str] = None
