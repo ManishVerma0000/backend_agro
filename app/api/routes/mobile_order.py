@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Any, Optional
-from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse, MobileOrderListResponse
+from app.schemas.mobile_order import MobileOrderCreate, MobileOrderResponse, MobileOrderListResponse, MobileOrderUpdatePaymentStatus, MobileOrderBulkUpdateStatus
 from app.crud.mobile_order import (
     place_order, get_customer_orders, get_warehouse_orders, 
     get_order_by_id, confirm_order, start_picking, 
-    get_warehouse_orders_by_status, start_packing, ready_for_dispatch, delete_order
+    get_warehouse_orders_by_status, start_packing, ready_for_dispatch, delete_order,
+    update_payment_status, bulk_update_status
 )
 
 router = APIRouter()
@@ -80,3 +81,15 @@ async def ready_for_dispatch_status(order_id: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
+@router.patch("/{order_id}/payment-status")
+async def update_payment_status_route(order_id: str, payment_in: MobileOrderUpdatePaymentStatus):
+    order = await update_payment_status(order_id, payment_in.paymentStatus)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+@router.post("/bulk-update-status")
+async def bulk_update_order_status(bulk_in: MobileOrderBulkUpdateStatus):
+    success = await bulk_update_status(bulk_in.orderIds, bulk_in.status)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update some or all orders")
+    return {"message": "Orders updated successfully"}

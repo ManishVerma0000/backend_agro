@@ -16,6 +16,7 @@ class WarehouseProductBase(BaseModel):
     basePrice: Optional[float] = 0.0
     location: Optional[str] = None
     status: Optional[str] = "Active"
+    imageUrl: Optional[str] = None
 
 class WarehouseProductCreate(WarehouseProductBase):
     pass
@@ -33,6 +34,7 @@ class WarehouseProductUpdate(BaseModel):
     basePrice: Optional[float] = None
     location: Optional[str] = None
     status: Optional[str] = None
+    imageUrl: Optional[str] = None
 
 class WarehouseProductResponse(WarehouseProductBase):
     id: str
@@ -41,6 +43,7 @@ class WarehouseProductResponse(WarehouseProductBase):
     subcategory: Optional[str] = None
     hsnCode: Optional[str] = None
     sellingPrice: Optional[float] = 0.0
+    imageUrl: Optional[str] = None
     
     model_config = ConfigDict(populate_by_name=True)
 

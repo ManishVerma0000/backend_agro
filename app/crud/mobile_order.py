@@ -320,3 +320,34 @@ async def ready_for_dispatch(order_id: str) -> Optional[dict]:
         return None
 
     return await get_order_by_id(order_id)
+
+async def update_payment_status(order_id: str, payment_status: str) -> Optional[dict]:
+    db = get_db()
+    try:
+        obj_id = ObjectId(order_id)
+    except:
+        return None
+
+    result = await db["mobile_orders"].update_one(
+        {"_id": obj_id},
+        {"$set": {"paymentStatus": payment_status}}
+    )
+
+    if result.matched_count == 0:
+        return None
+
+    return await get_order_by_id(order_id)
+
+async def bulk_update_status(order_ids: List[str], status: str) -> bool:
+    db = get_db()
+    try:
+        obj_ids = [ObjectId(oid) for oid in order_ids]
+    except:
+        return False
+
+    result = await db["mobile_orders"].update_many(
+        {"_id": {"$in": obj_ids}},
+        {"$set": {"status": status}}
+    )
+
+    return result.matched_count > 0

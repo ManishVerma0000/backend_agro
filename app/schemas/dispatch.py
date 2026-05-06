@@ -5,6 +5,7 @@ from datetime import datetime
 class DispatchBase(BaseModel):
     vehicleNumber: str
     driverName: str
+    driverPhone: Optional[str] = None
     orderIds: List[str]
     route: str
     status: Literal["Out for Delivery", "Delivered", "Pending"] = "Pending"
@@ -17,6 +18,7 @@ class DispatchUpdate(BaseModel):
     status: Optional[Literal["Out for Delivery", "Delivered", "Pending"]] = None
     vehicleNumber: Optional[str] = None
     driverName: Optional[str] = None
+    driverPhone: Optional[str] = None
     route: Optional[str] = None
 
 class DispatchResponse(DispatchBase):

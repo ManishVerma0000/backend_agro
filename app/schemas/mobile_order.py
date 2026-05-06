@@ -42,3 +42,10 @@ class MobileOrderListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+class MobileOrderUpdatePaymentStatus(BaseModel):
+    paymentStatus: str
+
+class MobileOrderBulkUpdateStatus(BaseModel):
+    orderIds: List[str]
+    status: str

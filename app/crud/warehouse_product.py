@@ -79,6 +79,7 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
                 "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
                 "baseUnit": "$product_info.baseUnit",
+                "imageUrl": "$product_info.imageUrl",
                 "sellingPrice": {
                     "$let": {
                         "vars": {
@@ -201,6 +202,7 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
                 "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
                 "baseUnit": "$product_info.baseUnit",
+                "imageUrl": "$product_info.imageUrl",
                 "sellingPrice": {
                     "$let": {
                         "vars": {
