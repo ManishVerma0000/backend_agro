@@ -17,8 +17,8 @@ async def create_supplier(supplier_in: SupplierCreate):
     return await crud_procurement.create_supplier(supplier_in)
 
 @router.get("/suppliers/{supplier_id}", response_model=SupplierResponse)
-async def read_supplier(supplier_id: str):
-    s = await crud_procurement.get_supplier(supplier_id)
+async def read_supplier(supplier_id: str, warehouse_id: Optional[str] = Query(None)):
+    s = await crud_procurement.get_supplier(supplier_id, warehouse_id)
     if not s:
         raise HTTPException(status_code=404, detail="Supplier not found")
     return s

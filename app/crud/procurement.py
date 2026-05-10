@@ -13,7 +13,7 @@ async def get_suppliers(warehouse_id: Optional[str] = None) -> List[dict]:
             {"warehouseId": warehouse_id},
             {"warehouse_id": warehouse_id}
         ]
-        
+    
     pipeline = []
     if match_stage:
         pipeline.append({"$match": match_stage})
@@ -112,13 +112,23 @@ async def get_suppliers(warehouse_id: Optional[str] = None) -> List[dict]:
     suppliers = []
     async for s in cursor:
         s["id"] = str(s.pop("_id"))
+        if "warehouse_id" in s and "warehouseId" not in s:
+            s["warehouseId"] = s.pop("warehouse_id")
         suppliers.append(s)
     return suppliers
 
-async def get_supplier(supplier_id: str) -> Optional[dict]:
+async def get_supplier(supplier_id: str, warehouse_id: Optional[str] = None) -> Optional[dict]:
     db = get_db()
+    
+    match_stage = {"_id": ObjectId(supplier_id)}
+    if warehouse_id and warehouse_id not in ["undefined", "null", ""]:
+        match_stage["$or"] = [
+            {"warehouseId": warehouse_id},
+            {"warehouse_id": warehouse_id}
+        ]
+        
     pipeline = [
-        {"$match": {"_id": ObjectId(supplier_id)}},
+        {"$match": match_stage},
         {
             "$addFields": {
                 "supplierIdStr": {"$toString": "$_id"}
@@ -211,6 +221,8 @@ async def get_supplier(supplier_id: str) -> Optional[dict]:
     suppliers = []
     async for s in cursor:
         s["id"] = str(s.pop("_id"))
+        if "warehouse_id" in s and "warehouseId" not in s:
+            s["warehouseId"] = s.pop("warehouse_id")
         suppliers.append(s)
     return suppliers[0] if suppliers else None
 
