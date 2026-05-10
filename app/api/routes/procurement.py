@@ -64,8 +64,8 @@ async def delete_supplier_product(product_id: str):
 
 # Purchase Orders
 @router.get("/purchase-orders", response_model=List[PurchaseOrderResponse])
-async def read_purchase_orders():
-    return await crud_procurement.get_purchase_orders()
+async def read_purchase_orders(warehouse_id: Optional[str] = Query(None)):
+    return await crud_procurement.get_purchase_orders(warehouse_id)
 
 @router.post("/purchase-orders", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_purchase_order(po_in: PurchaseOrderCreate):

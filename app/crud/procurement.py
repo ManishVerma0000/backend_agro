@@ -236,9 +236,17 @@ async def delete_supplier(supplier_id: str) -> bool:
     return result.deleted_count > 0
 
 # Purchase Orders
-async def get_purchase_orders() -> List[dict]:
+async def get_purchase_orders(warehouse_id: Optional[str] = None) -> List[dict]:
     db = get_db()
-    cursor = db["purchase_orders"].find()
+    
+    query = {}
+    if warehouse_id and warehouse_id not in ["undefined", "null", ""]:
+        query["$or"] = [
+            {"warehouseId": warehouse_id},
+            {"warehouse_id": warehouse_id}
+        ]
+        
+    cursor = db["purchase_orders"].find(query)
     pos = []
     async for p in cursor:
         p["id"] = str(p.pop("_id"))
@@ -278,6 +286,7 @@ async def get_purchase_order(po_id: str) -> Optional[dict]:
                 "expectedDelivery": {"$first": "$expectedDelivery"},
                 "totalAmount": {"$first": "$totalAmount"},
                 "status": {"$first": "$status"},
+                "warehouseId": {"$first": "$warehouseId"},
                 "items": {"$push": "$items"}
             }
         }

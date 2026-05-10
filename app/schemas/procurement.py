@@ -51,6 +51,7 @@ class PurchaseOrderBase(BaseModel):
     expectedDelivery: str
     totalAmount: float
     status: str # 'Pending', 'Partially Received', 'Received', 'Cancelled'
+    warehouseId: str
     items: List[Dict[str, Any]] # Array of { productId, productName, quantity, unitPrice }
 
 class PurchaseOrderCreate(PurchaseOrderBase):
