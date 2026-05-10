@@ -4,9 +4,21 @@ from app.db.session import get_db
 from app.schemas.procurement import SupplierCreate, SupplierUpdate, PurchaseOrderCreate, PurchaseOrderUpdate
 
 # Suppliers
-async def get_suppliers() -> List[dict]:
+async def get_suppliers(warehouse_id: Optional[str] = None) -> List[dict]:
     db = get_db()
-    pipeline = [
+    
+    match_stage = {}
+    if warehouse_id and warehouse_id not in ["undefined", "null", ""]:
+        match_stage["$or"] = [
+            {"warehouseId": warehouse_id},
+            {"warehouse_id": warehouse_id}
+        ]
+        
+    pipeline = []
+    if match_stage:
+        pipeline.append({"$match": match_stage})
+        
+    pipeline.extend([
         {
             "$addFields": {
                 "supplierIdStr": {"$toString": "$_id"}
@@ -94,7 +106,7 @@ async def get_suppliers() -> List[dict]:
                 "productsSet": 0
             }
         }
-    ]
+    ])
     
     cursor = db["suppliers"].aggregate(pipeline)
     suppliers = []

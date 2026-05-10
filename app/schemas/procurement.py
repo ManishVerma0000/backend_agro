@@ -10,6 +10,7 @@ class SupplierBase(BaseModel):
     location: str
     gstNumber: Optional[str] = None
     status: str = "Active"
+    warehouseId: str
     
     # Tracking metrics (defaults to 0 for a new supplier)
     products: int = 0

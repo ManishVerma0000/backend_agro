@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
-from typing import List
+from fastapi import APIRouter, HTTPException, status, Query
+from typing import List, Optional
 from app.schemas.procurement import SupplierCreate, SupplierUpdate, SupplierResponse, PurchaseOrderCreate, PurchaseOrderUpdate, PurchaseOrderResponse
 from app.schemas.supplier_product import SupplierProductCreate, SupplierProductUpdate, SupplierProductResponse
 from app.crud import procurement as crud_procurement
@@ -9,8 +9,8 @@ router = APIRouter()
 
 # Suppliers
 @router.get("/suppliers", response_model=List[SupplierResponse])
-async def read_suppliers():
-    return await crud_procurement.get_suppliers()
+async def read_suppliers(warehouse_id: Optional[str] = Query(None)):
+    return await crud_procurement.get_suppliers(warehouse_id)
 
 @router.post("/suppliers", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
 async def create_supplier(supplier_in: SupplierCreate):
