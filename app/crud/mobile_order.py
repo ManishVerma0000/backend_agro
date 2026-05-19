@@ -5,6 +5,114 @@ from app.db.session import get_db
 from app.schemas.mobile_order import MobileOrderCreate
 from app.crud.mobile_cart import get_active_cart
 
+async def reserve_order_stock(order_id: str, db) -> None:
+    order = await db["mobile_orders"].find_one({"_id": ObjectId(order_id)})
+    if not order:
+        return
+        
+    warehouse_id = order.get("warehouseId")
+    if not warehouse_id:
+        return
+        
+    items = order.get("items", []) or order.get("cartItems", [])
+    for item in items:
+        product_id = item.get("productId")
+        qty = item.get("quantity", 0)
+        if not product_id or qty <= 0:
+            continue
+            
+        wp = await db["warehouse_products"].find_one({"productId": product_id, "warehouseId": warehouse_id})
+        if wp:
+            await db["warehouse_products"].update_one(
+                {"_id": wp["_id"]},
+                {
+                    "$inc": {
+                        "reservedStock": qty,
+                        "availableStock": -qty
+                    }
+                }
+            )
+        else:
+            prod_details = await db["products"].find_one({"_id": ObjectId(product_id)})
+            image_url = prod_details.get("imageUrl") if prod_details else None
+            
+            from app.schemas.warehouse_product import WarehouseProductCreate
+            wp_create = WarehouseProductCreate(
+                productId=product_id,
+                warehouseId=warehouse_id,
+                initialStock=0,
+                currentStock=0,
+                reservedStock=qty,
+                availableStock=-qty,
+                basePrice=item.get("unitPrice") or 0.0,
+                imageUrl=image_url
+            )
+            await db["warehouse_products"].insert_one(wp_create.model_dump())
+
+async def update_order_status_in_db(order_id: str, new_status: str, db) -> None:
+    order = await db["mobile_orders"].find_one({"_id": ObjectId(order_id)})
+    if not order:
+        return
+        
+    prev_status = order.get("status")
+    
+    if prev_status == new_status:
+        return
+        
+    await db["mobile_orders"].update_one(
+        {"_id": ObjectId(order_id)},
+        {"$set": {"status": new_status}}
+    )
+    
+    if new_status == "Out for Delivery" and not order.get("stockReduced"):
+        warehouse_id = order.get("warehouseId")
+        items = order.get("items", []) or order.get("cartItems", [])
+        
+        for item in items:
+            product_id = item.get("productId")
+            qty = item.get("quantity", 0)
+            if not product_id or qty <= 0:
+                continue
+                
+            wp = await db["warehouse_products"].find_one({"productId": product_id, "warehouseId": warehouse_id})
+            if wp:
+                prev_stock = wp.get("currentStock", 0)
+                new_stock = prev_stock - qty
+                
+                await db["warehouse_products"].update_one(
+                    {"_id": wp["_id"]},
+                    {
+                        "$inc": {
+                            "currentStock": -qty,
+                            "reservedStock": -qty
+                        }
+                    }
+                )
+            else:
+                prev_stock = 0
+                new_stock = -qty
+                
+            from app.schemas.inventory_movement import InventoryMovementCreate
+            from app.crud.inventory_movement import log_movement
+            
+            movement = InventoryMovementCreate(
+                productId=product_id,
+                warehouseId=warehouse_id,
+                type="Order Fulfillment",
+                quantity=-qty,
+                prevStock=prev_stock,
+                newStock=new_stock,
+                reference=f"Order Dispatched: {order.get('orderNumber') or order.get('id')}",
+                user="System",
+                date=datetime.utcnow()
+            )
+            await log_movement(movement)
+            
+        await db["mobile_orders"].update_one(
+            {"_id": ObjectId(order_id)},
+            {"$set": {"stockReduced": True}}
+        )
+
 async def place_order(order_in: MobileOrderCreate) -> dict:
     db = get_db()
     order_dict = order_in.model_dump(exclude_unset=True)
@@ -14,13 +122,13 @@ async def place_order(order_in: MobileOrderCreate) -> dict:
     
     if not items:
         raise ValueError("Cannot place an order without items")
-
+ 
     # Handle mobile address object if provided
     if order_in.address and isinstance(order_in.address, dict):
         order_dict["deliveryAddress"] = order_in.address
         if "id" in order_in.address:
             order_dict["deliveryAddressId"] = order_in.address["id"]
-
+ 
     # Clean up redundant keys
     order_dict.pop("cartItems", None)
     order_dict.pop("address", None)
@@ -34,8 +142,10 @@ async def place_order(order_in: MobileOrderCreate) -> dict:
     if "paymentStatus" not in order_dict:
         order_dict["paymentStatus"] = None
     
-    
     result = await db["mobile_orders"].insert_one(order_dict)
+    
+    # Reserve stock for the order
+    await reserve_order_stock(str(result.inserted_id), db)
     
     # Record offer usage if present
     if order_in.offerId:
@@ -212,14 +322,7 @@ async def confirm_order(order_id: str) -> Optional[dict]:
     except:
         return None
     
-    result = await db["mobile_orders"].update_one(
-        {"_id": obj_id},
-        {"$set": {"status": "Confirmed"}}
-    )
-    
-    if result.matched_count == 0:
-        return None
-    
+    await update_order_status_in_db(order_id, "Confirmed", db)
     return await get_order_by_id(order_id)
 
 
@@ -230,14 +333,7 @@ async def start_picking(order_id: str) -> Optional[dict]:
     except:
         return None
     
-    result = await db["mobile_orders"].update_one(
-        {"_id": obj_id},
-        {"$set": {"status": "Picking"}}
-    )
-    
-    if result.matched_count == 0:
-        return None
-    
+    await update_order_status_in_db(order_id, "Picking", db)
     return await get_order_by_id(order_id)
 
 
@@ -293,14 +389,26 @@ async def start_packing(order_id: str) -> Optional[dict]:
     except:
         return None
 
-    result = await db["mobile_orders"].update_one(
-        {"_id": obj_id},
-        {"$set": {"status": "Packing"}}
-    )
-
-    if result.matched_count == 0:
+    order = await db["mobile_orders"].find_one({"_id": obj_id})
+    if not order:
         return None
+        
+    warehouse_id = order.get("warehouseId")
+    items = order.get("items", []) or order.get("cartItems", [])
+    
+    for item in items:
+        product_id = item.get("productId")
+        qty = item.get("quantity", 0)
+        if not product_id or qty <= 0:
+            continue
+            
+        wp = await db["warehouse_products"].find_one({"productId": product_id, "warehouseId": warehouse_id})
+        
+        # If no record exists, or if availableStock < 0 (reservation deficit), or if currentStock < qty (physical deficit)
+        if not wp or wp.get("availableStock", 0) < 0 or wp.get("currentStock", 0) < qty:
+            raise ValueError("Items stock is not available or partially available")
 
+    await update_order_status_in_db(order_id, "Packing", db)
     return await get_order_by_id(order_id)
 
 
@@ -311,14 +419,7 @@ async def ready_for_dispatch(order_id: str) -> Optional[dict]:
     except:
         return None
 
-    result = await db["mobile_orders"].update_one(
-        {"_id": obj_id},
-        {"$set": {"status": ""}}
-    )
-
-    if result.matched_count == 0:
-        return None
-
+    await update_order_status_in_db(order_id, "Ready for Dispatch", db)
     return await get_order_by_id(order_id)
 
 async def update_payment_status(order_id: str, payment_status: str) -> Optional[dict]:
@@ -340,14 +441,9 @@ async def update_payment_status(order_id: str, payment_status: str) -> Optional[
 
 async def bulk_update_status(order_ids: List[str], status: str) -> bool:
     db = get_db()
-    try:
-        obj_ids = [ObjectId(oid) for oid in order_ids]
-    except:
-        return False
-
-    result = await db["mobile_orders"].update_many(
-        {"_id": {"$in": obj_ids}},
-        {"$set": {"status": status}}
-    )
-
-    return result.matched_count > 0
+    for oid in order_ids:
+        try:
+            await update_order_status_in_db(oid, status, db)
+        except Exception as e:
+            print(f"Error bulk updating order {oid}: {e}")
+    return True

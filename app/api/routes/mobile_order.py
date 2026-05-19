@@ -70,10 +70,13 @@ async def start_picking_status(order_id: str):
 
 @router.patch("/{order_id}/start-packing")
 async def start_packing_status(order_id: str):
-    order = await start_packing(order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    return order
+    try:
+        order = await start_packing(order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        return order
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/{order_id}/ready-for-dispatch")
 async def ready_for_dispatch_status(order_id: str):

@@ -3,6 +3,7 @@ from bson import ObjectId
 from app.db.session import get_db
 from app.schemas.dispatch import DispatchCreate, DispatchUpdate
 from datetime import datetime
+from app.crud.mobile_order import update_order_status_in_db
 
 async def generate_dispatch_id() -> str:
     db = get_db()
@@ -19,13 +20,13 @@ async def create_dispatch(dispatch_in: DispatchCreate) -> dict:
     
     result = await db["dispatches"].insert_one(dispatch_dict)
     
-    # Update status of mobile orders to "Ready for Dispatch" or "Out for Delivery"
-    # The user said when they click "Ready for Dispatch" it should come in history.
-    # So we'll update the orders associated with this dispatch.
-    await db["mobile_orders"].update_many(
-        {"_id": {"$in": [ObjectId(oid) for oid in dispatch_in.orderIds]}},
-        {"$set": {"status": "Out for Delivery", "dispatchId": str(result.inserted_id)}}
-    )
+    # Update status of mobile orders to "Out for Delivery"
+    for oid in dispatch_in.orderIds:
+        await update_order_status_in_db(oid, "Out for Delivery", db)
+        await db["mobile_orders"].update_one(
+            {"_id": ObjectId(oid)},
+            {"$set": {"dispatchId": str(result.inserted_id)}}
+        )
     
     dispatch_dict["id"] = str(result.inserted_id)
     return dispatch_dict
@@ -57,8 +58,6 @@ async def update_dispatch_status(dispatch_id: str, status: str) -> Optional[dict
     # Update orders too
     dispatch = await get_dispatch(dispatch_id)
     if dispatch:
-        await db["mobile_orders"].update_many(
-            {"_id": {"$in": [ObjectId(oid) for oid in dispatch["orderIds"]]}},
-            {"$set": {"status": status}}
-        )
+        for oid in dispatch["orderIds"]:
+            await update_order_status_in_db(oid, status, db)
     return dispatch

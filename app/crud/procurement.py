@@ -320,12 +320,105 @@ async def create_purchase_order(po_in: PurchaseOrderCreate) -> dict:
 
 async def update_purchase_order(po_id: str, po_in: PurchaseOrderUpdate) -> Optional[dict]:
     db = get_db()
+    
+    # 1. Fetch previous purchase order status and warehouseId
+    po = await db["purchase_orders"].find_one({"_id": ObjectId(po_id)})
+    if not po:
+        return None
+    prev_status = po.get("status")
+    warehouse_id = po.get("warehouseId")
+    
+    # 2. Update the purchase order in db
     update_data = po_in.model_dump(exclude_unset=True)
     if update_data:
         await db["purchase_orders"].update_one(
             {"_id": ObjectId(po_id)},
             {"$set": update_data}
         )
+        
+    # Get the updated PO to get full item list and new status
+    updated_po = await db["purchase_orders"].find_one({"_id": ObjectId(po_id)})
+    if not updated_po:
+        return None
+        
+    new_status = updated_po.get("status")
+    
+    # 3. Check for transition to 'Completed' or 'Received'
+    if new_status in ["Completed", "Received"] and prev_status not in ["Completed", "Received"]:
+        items = updated_po.get("items", [])
+        for item in items:
+            product_id = item.get("productId")
+            if not product_id:
+                continue
+                
+            qty = item.get("receivedQuantity")
+            if qty is None:
+                qty = item.get("quantity", 0)
+                
+            if qty <= 0:
+                continue
+                
+            # Find the warehouse product record
+            wp = await db["warehouse_products"].find_one({"productId": product_id, "warehouseId": warehouse_id})
+            
+            if wp:
+                prev_stock = wp.get("currentStock", 0)
+                new_stock = prev_stock + qty
+                actual_price = item.get("actualUnitPrice") or item.get("unitPrice") or 0.0
+                
+                await db["warehouse_products"].update_one(
+                    {"_id": wp["_id"]},
+                    {
+                        "$inc": {
+                            "currentStock": qty,
+                            "availableStock": qty,
+                            "stockIn": qty
+                        },
+                        "$set": {
+                            "basePrice": actual_price
+                        }
+                    }
+                )
+            else:
+                # If warehouse product record doesn't exist, create it!
+                prev_stock = 0
+                new_stock = qty
+                
+                # Fetch product info from products collection if available to copy imageUrl
+                prod_details = await db["products"].find_one({"_id": ObjectId(product_id)})
+                image_url = prod_details.get("imageUrl") if prod_details else None
+                
+                from app.schemas.warehouse_product import WarehouseProductCreate
+                wp_create = WarehouseProductCreate(
+                    productId=product_id,
+                    warehouseId=warehouse_id,
+                    initialStock=0,
+                    currentStock=qty,
+                    availableStock=qty,
+                    stockIn=qty,
+                    basePrice=item.get("actualUnitPrice") or item.get("unitPrice") or 0.0,
+                    imageUrl=image_url
+                )
+                await db["warehouse_products"].insert_one(wp_create.model_dump())
+                
+            # Log the movement
+            from app.schemas.inventory_movement import InventoryMovementCreate
+            from app.crud.inventory_movement import log_movement
+            from datetime import datetime
+            
+            movement = InventoryMovementCreate(
+                productId=product_id,
+                warehouseId=warehouse_id,
+                type="Stock In",
+                quantity=qty,
+                prevStock=prev_stock,
+                newStock=new_stock,
+                reference=f"PO Received: {updated_po.get('poNumber')}",
+                user="System",
+                date=datetime.utcnow()
+            )
+            await log_movement(movement)
+            
     return await get_purchase_order(po_id)
 
 async def delete_purchase_order(po_id: str) -> bool:
