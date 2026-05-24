@@ -64,6 +64,20 @@ async def update_order_status_in_db(order_id: str, new_status: str, db) -> None:
         {"$set": {"status": new_status}}
     )
     
+    if new_status == "Delivered":
+        dispatch_id = order.get("dispatchId")
+        if dispatch_id:
+            try:
+                total_in_dispatch = await db["mobile_orders"].count_documents({"dispatchId": dispatch_id})
+                delivered_in_dispatch = await db["mobile_orders"].count_documents({"dispatchId": dispatch_id, "status": "Delivered"})
+                if total_in_dispatch > 0 and total_in_dispatch == delivered_in_dispatch:
+                    await db["dispatches"].update_one(
+                        {"_id": ObjectId(dispatch_id)},
+                        {"$set": {"status": "Delivered"}}
+                    )
+            except Exception as ex:
+                print(f"Error checking dispatch delivery status for batch {dispatch_id}: {ex}")
+    
     if new_status == "Out for Delivery" and not order.get("stockReduced"):
         warehouse_id = order.get("warehouseId")
         items = order.get("items", []) or order.get("cartItems", [])
@@ -113,6 +127,23 @@ async def update_order_status_in_db(order_id: str, new_status: str, db) -> None:
             {"$set": {"stockReduced": True}}
         )
 
+async def resolve_closest_warehouse_id(address: dict) -> Optional[str]:
+    if not address or not isinstance(address, dict):
+        return None
+    lat_val = address.get("lat")
+    lon_val = address.get("long") or address.get("lon") or address.get("lng")
+    if lat_val is not None and lon_val is not None:
+        try:
+            lat_f = float(lat_val)
+            lon_f = float(lon_val)
+            from app.crud.mobile import get_nearest_warehouse
+            nearest = await get_nearest_warehouse(lat_f, lon_f)
+            if nearest:
+                return nearest["id"]
+        except Exception as e:
+            print(f"Error resolving closest warehouse: {e}")
+    return None
+
 async def place_order(order_in: MobileOrderCreate) -> dict:
     db = get_db()
     order_dict = order_in.model_dump(exclude_unset=True)
@@ -128,6 +159,11 @@ async def place_order(order_in: MobileOrderCreate) -> dict:
         order_dict["deliveryAddress"] = order_in.address
         if "id" in order_in.address:
             order_dict["deliveryAddressId"] = order_in.address["id"]
+            
+        # Dynamically resolve closest warehouse ID based on address coordinates
+        resolved_wh_id = await resolve_closest_warehouse_id(order_in.address)
+        if resolved_wh_id:
+            order_dict["warehouseId"] = resolved_wh_id
  
     # Clean up redundant keys
     order_dict.pop("cartItems", None)
@@ -174,6 +210,13 @@ async def get_order(order_id: str) -> Optional[dict]:
     order = await db["mobile_orders"].find_one({"_id": ObjectId(order_id)})
     if order:
         order["id"] = str(order.pop("_id"))
+        
+        # Dynamically resolve closest warehouse ID if coordinates exist
+        addr = order.get("deliveryAddress")
+        resolved_wh_id = await resolve_closest_warehouse_id(addr)
+        if resolved_wh_id:
+            order["warehouseId"] = resolved_wh_id
+            
     return order
 
 
@@ -190,6 +233,13 @@ async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20, 
     orders = []
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
+        
+        # Dynamically resolve closest warehouse ID if coordinates exist
+        addr = order.get("deliveryAddress")
+        resolved_wh_id = await resolve_closest_warehouse_id(addr)
+        if resolved_wh_id:
+            order["warehouseId"] = resolved_wh_id
+            
         orders.append(order)
     return {
         "items": orders,
@@ -310,6 +360,13 @@ async def get_order_by_id(order_id: str) -> Optional[dict]:
     cursor = db["mobile_orders"].aggregate(pipeline)
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
+        
+        # Dynamically resolve closest warehouse ID if coordinates exist
+        addr = order.get("deliveryAddress")
+        resolved_wh_id = await resolve_closest_warehouse_id(addr)
+        if resolved_wh_id:
+            order["warehouseId"] = resolved_wh_id
+            
         return order
         
     return None
