@@ -39,3 +39,25 @@ async def remove_offer(id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Offer not found")
     return {"message": "Offer deleted successfully"}
+
+from pydantic import BaseModel
+from app.services.offer_logic import evaluate_offer_rules
+
+class OfferEvaluationRequest(BaseModel):
+    customerId: Optional[str] = None
+    cartValue: float = 0.0
+    simulateInactive: Optional[bool] = None
+    simulateNew: Optional[bool] = None
+
+@router.post("/evaluate")
+async def evaluate_offer(payload: OfferEvaluationRequest):
+    try:
+        return await evaluate_offer_rules(
+            customer_id=payload.customerId,
+            cart_value=payload.cartValue,
+            simulate_inactive=payload.simulateInactive,
+            simulate_new=payload.simulateNew
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
