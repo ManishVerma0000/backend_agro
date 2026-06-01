@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 from app.schemas.offer import OfferCreate, OfferUpdate, OfferResponse
 from app.crud.offer import (
     create_offer,
