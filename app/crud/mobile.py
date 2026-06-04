@@ -14,7 +14,12 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
     
     pipeline = [
         {"$match": match_query},
-        {"$addFields": {"productObjectId": {"$toObjectId": "$productId"}}},
+        {
+            "$addFields": {
+                "productObjectId": {"$toObjectId": "$productId"},
+                "warehouseObjectId": {"$toObjectId": "$warehouseId"}
+            }
+        },
         {
             "$lookup": {
                 "from": "products",
@@ -26,6 +31,15 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
         {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
         # Filter active master products
         {"$match": {"product_info.status": "Active"}},
+        {
+            "$lookup": {
+                "from": "warehouses",
+                "localField": "warehouseObjectId",
+                "foreignField": "_id",
+                "as": "warehouse_info"
+            }
+        },
+        {"$unwind": {"path": "$warehouse_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
                 "categoryObjectId": {
@@ -41,6 +55,35 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
                         {"$toObjectId": "$product_info.subcategoryId"},
                         None
                     ]
+                },
+                "sellingPrice": {
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
+                                        }
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
+                                }
+                            }
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
+                        }
+                    }
                 }
             }
         },
@@ -85,8 +128,8 @@ async def get_mobile_products(warehouse_id: str, category_id: Optional[str] = No
             "status": 1,
             "basePrice": {
                 "$cond": [
-                    {"$and": [{"$ne": ["$basePrice", None]}, {"$gt": ["$basePrice", 0]}]},
-                    "$basePrice", 
+                    {"$and": [{"$ne": ["$sellingPrice", None]}, {"$gt": ["$sellingPrice", 0]}]},
+                    "$sellingPrice", 
                     {"$toDouble": "$product_info.basePrice"}
                 ]
             },
@@ -145,7 +188,12 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
     
     pipeline = [
         {"$match": match_query},
-        {"$addFields": {"productObjectId": {"$toObjectId": "$productId"}}},
+        {
+            "$addFields": {
+                "productObjectId": {"$toObjectId": "$productId"},
+                "warehouseObjectId": {"$toObjectId": "$warehouseId"}
+            }
+        },
         {
             "$lookup": {
                 "from": "products",
@@ -156,6 +204,15 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
         },
         {"$unwind": {"path": "$product_info", "preserveNullAndEmptyArrays": True}},
         {"$match": {"product_info.status": "Active"}},
+        {
+            "$lookup": {
+                "from": "warehouses",
+                "localField": "warehouseObjectId",
+                "foreignField": "_id",
+                "as": "warehouse_info"
+            }
+        },
+        {"$unwind": {"path": "$warehouse_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
                 "categoryObjectId": {
@@ -171,6 +228,35 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
                         {"$toObjectId": "$product_info.subcategoryId"},
                         None
                     ]
+                },
+                "sellingPrice": {
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
+                                        }
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
+                                }
+                            }
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
+                        }
+                    }
                 }
             }
         },
@@ -200,8 +286,8 @@ async def get_mobile_product_details(warehouse_id: str, product_id: str) -> Opti
                 "status": 1,
                 "basePrice": {
                     "$cond": [
-                        {"$and": [{"$ne": ["$basePrice", None]}, {"$gt": ["$basePrice", 0]}]},
-                        "$basePrice", 
+                        {"$and": [{"$ne": ["$sellingPrice", None]}, {"$gt": ["$sellingPrice", 0]}]},
+                        "$sellingPrice", 
                         {"$toDouble": "$product_info.basePrice"}
                     ]
                 },
