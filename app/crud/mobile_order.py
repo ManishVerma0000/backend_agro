@@ -205,6 +205,50 @@ async def delete_order(order_id: str) -> bool:
     return result.deleted_count > 0
 
 
+async def enrich_order_details(order: dict, db) -> dict:
+    if not order:
+        return order
+        
+    warehouse_id = order.get("warehouseId")
+    
+    # 1. Ensure location/delivery address string is set
+    if not order.get("location"):
+        addr = order.get("deliveryAddress")
+        if isinstance(addr, dict):
+            order["location"] = addr.get("location") or addr.get("city") or "Unknown Location"
+            
+    # 2. Enrich items
+    items = order.get("items", []) or order.get("cartItems", [])
+    if items:
+        for item in items:
+            # Product Image fallback
+            if not item.get("imageUrl") and item.get("productId"):
+                try:
+                    prod_doc = await db["products"].find_one({"_id": ObjectId(item["productId"])})
+                    if prod_doc:
+                        item["imageUrl"] = prod_doc.get("imageUrl")
+                except:
+                    pass
+            
+            # Price & Total fallback
+            price = item.get("basePrice") or item.get("unitPrice") or item.get("price") or item.get("sellingPrice")
+            if (not price or price == 0) and item.get("productId") and warehouse_id:
+                try:
+                    from app.crud.mobile import get_mobile_product_details
+                    wp_details = await get_mobile_product_details(warehouse_id, item["productId"])
+                    if wp_details:
+                        price = wp_details.get("basePrice")
+                except:
+                    pass
+            
+            price_val = float(price) if price else 0.0
+            item["basePrice"] = price_val
+            item["unitPrice"] = price_val
+            item["total"] = float(item.get("quantity") or 0) * price_val
+            
+    return order
+
+
 async def get_order(order_id: str) -> Optional[dict]:
     db = get_db()
     order = await db["mobile_orders"].find_one({"_id": ObjectId(order_id)})
@@ -216,6 +260,8 @@ async def get_order(order_id: str) -> Optional[dict]:
         resolved_wh_id = await resolve_closest_warehouse_id(addr)
         if resolved_wh_id:
             order["warehouseId"] = resolved_wh_id
+            
+        await enrich_order_details(order, db)
             
     return order
 
@@ -240,6 +286,7 @@ async def get_customer_orders(customer_id: str, skip: int = 0, limit: int = 20, 
         if resolved_wh_id:
             order["warehouseId"] = resolved_wh_id
             
+        await enrich_order_details(order, db)
         orders.append(order)
     return {
         "items": orders,
@@ -295,6 +342,7 @@ async def get_warehouse_orders(warehouse_id: str, skip: int = 0, limit: int = 10
     orders = []
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
+        await enrich_order_details(order, db)
         orders.append(order)
     return {
         "items": orders,
@@ -349,7 +397,12 @@ async def get_order_by_id(order_id: str) -> Optional[dict]:
                             {"$ifNull": ["$address_info.shopName", ""]}, ", ",
                             {"$ifNull": ["$address_info.location", ""]}
                         ]},
-                        {"$ifNull": ["$customer_info.city", "Unknown Location"]}
+                        {"$ifNull": [
+                            "$deliveryAddress.location",
+                            "$deliveryAddress.city",
+                            "$customer_info.city",
+                            "Unknown Location"
+                        ]}
                     ]
                 }
             }
@@ -367,6 +420,7 @@ async def get_order_by_id(order_id: str) -> Optional[dict]:
         if resolved_wh_id:
             order["warehouseId"] = resolved_wh_id
             
+        await enrich_order_details(order, db)
         return order
         
     return None
@@ -435,6 +489,7 @@ async def get_warehouse_orders_by_status(warehouse_id: str, status: str) -> List
     orders = []
     async for order in cursor:
         order["id"] = str(order.pop("_id"))
+        await enrich_order_details(order, db)
         orders.append(order)
     return orders
 
