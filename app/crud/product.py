@@ -9,12 +9,19 @@ async def get_products(skip: int = 0, limit: int = 10) -> dict:
     total = await db["products"].count_documents({})
     
     pipeline = [
-        {"$sort": {"createdAt": -1}},
+        {"$sort": {"_id": -1}},
         {"$skip": skip},
         {"$limit": limit},
         {
             "$addFields": {
-                "categoryObjectId": {"$toObjectId": "$categoryId"}
+                "categoryObjectId": {
+                    "$convert": {
+                        "input": "$categoryId",
+                        "to": "objectId",
+                        "onError": None,
+                        "onNull": None
+                    }
+                }
             }
         },
         {
@@ -66,7 +73,14 @@ async def get_product(product_id: str) -> Optional[dict]:
         },
         {
             "$addFields": {
-                "categoryObjectId": {"$toObjectId": "$categoryId"}
+                "categoryObjectId": {
+                    "$convert": {
+                        "input": "$categoryId",
+                        "to": "objectId",
+                        "onError": None,
+                        "onNull": None
+                    }
+                }
             }
         },
         {
@@ -127,6 +141,10 @@ async def create_product(product_in: ProductCreate) -> dict:
     db = get_db()
     prod_dict = product_in.model_dump()
     prod_dict = calculate_b2b_rates(prod_dict)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    prod_dict["createdAt"] = now
+    prod_dict["updatedAt"] = now
     result = await db["products"].insert_one(prod_dict)
     return await get_product(str(result.inserted_id))
 
