@@ -13,7 +13,29 @@ async def get_maps_details(url: str = Query(..., description="The shortened Goog
         
     details = await resolve_google_maps_url(url)
     
-    if "error" in details:
-        raise HTTPException(status_code=400, detail=details["error"])
-        
     return details
+
+@router.get("/proxy-image")
+async def proxy_image(url: str = Query(..., description="External image URL to proxy")):
+    """
+    Proxies external images (like S3) to prevent browser CORS blocking.
+    """
+    import httpx
+    from fastapi.responses import Response
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to fetch image")
+            media_type = resp.headers.get("content-type", "image/jpeg")
+            return Response(
+                content=resp.content,
+                media_type=media_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400"
+                }
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
