@@ -14,14 +14,9 @@ class WarehouseProductBase(BaseModel):
     wastageStock: Optional[int] = 0
     reorderLevel: Optional[int] = 0
     basePrice: Optional[float] = 0.0
-    sellingPrice: Optional[float] = None
     location: Optional[str] = None
     status: Optional[str] = "Active"
     imageUrl: Optional[str] = None
-    productName: Optional[str] = None
-    category: Optional[str] = None
-    subcategory: Optional[str] = None
-    unit: Optional[str] = None
 
 class WarehouseProductCreate(WarehouseProductBase):
     pass
@@ -37,14 +32,9 @@ class WarehouseProductUpdate(BaseModel):
     wastageStock: Optional[int] = None
     reorderLevel: Optional[int] = None
     basePrice: Optional[float] = None
-    sellingPrice: Optional[float] = None
     location: Optional[str] = None
     status: Optional[str] = None
     imageUrl: Optional[str] = None
-    productName: Optional[str] = None
-    category: Optional[str] = None
-    subcategory: Optional[str] = None
-    unit: Optional[str] = None
 
 class WarehouseProductResponse(WarehouseProductBase):
     id: str
