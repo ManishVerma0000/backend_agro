@@ -74,49 +74,40 @@ async def get_warehouse_products(warehouse_id: str = None) -> List[dict]:
         {"$unwind": {"path": "$subcategory_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
-                "productName": {"$ifNull": ["$productName", "$product_info.name"]},
-                "category": {"$ifNull": ["$category", "$category_info.name", "$product_info.category"]},
-                "subcategory": {"$ifNull": ["$subcategory", "$subcategory_info.name", "$product_info.subcategory"]},
+                "productName": "$product_info.name",
+                "category": "$category_info.name",
+                "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
-                "baseUnit": {"$ifNull": ["$unit", "$product_info.baseUnit"]},
-                "imageUrl": {"$ifNull": ["$imageUrl", "$product_info.imageUrl"]},
+                "baseUnit": "$product_info.baseUnit",
+                "imageUrl": "$product_info.imageUrl",
                 "sellingPrice": {
-                    "$cond": [
-                        {"$and": [
-                            {"$ne": ["$sellingPrice", None]},
-                            {"$gt": [{"$toDouble": "$sellingPrice"}, 0]}
-                        ]},
-                        {"$toDouble": "$sellingPrice"},
-                        {
-                            "$let": {
-                                "vars": {
-                                    "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
-                                    "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                                    "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
-                                    "mg": {
-                                        "$convert": {
-                                            "input": {
-                                                "$replaceAll": {
-                                                    "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
-                                                    "find": "%",
-                                                    "replacement": ""
-                                                }
-                                            },
-                                            "to": "double",
-                                            "onError": 0,
-                                            "onNull": 0
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
                                         }
-                                    }
-                                },
-                                "in": {
-                                    "$multiply": [
-                                        {"$add": ["$$oc", "$$lc", "$$bp"]},
-                                        {"$add": [1, {"$divide": ["$$mg", 100]}]}
-                                    ]
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
                                 }
                             }
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
                         }
-                    ]
+                    }
                 }
             }
         },
@@ -206,49 +197,40 @@ async def get_warehouse_product(product_id: str) -> Optional[dict]:
         {"$unwind": {"path": "$subcategory_info", "preserveNullAndEmptyArrays": True}},
         {
             "$addFields": {
-                "productName": {"$ifNull": ["$productName", "$product_info.name"]},
-                "category": {"$ifNull": ["$category", "$category_info.name", "$product_info.category"]},
-                "subcategory": {"$ifNull": ["$subcategory", "$subcategory_info.name", "$product_info.subcategory"]},
+                "productName": "$product_info.name",
+                "category": "$category_info.name",
+                "subcategory": "$subcategory_info.name",
                 "hsnCode": "$product_info.hsn",
-                "baseUnit": {"$ifNull": ["$unit", "$product_info.baseUnit"]},
-                "imageUrl": {"$ifNull": ["$imageUrl", "$product_info.imageUrl"]},
+                "baseUnit": "$product_info.baseUnit",
+                "imageUrl": "$product_info.imageUrl",
                 "sellingPrice": {
-                    "$cond": [
-                        {"$and": [
-                            {"$ne": ["$sellingPrice", None]},
-                            {"$gt": [{"$toDouble": "$sellingPrice"}, 0]}
-                        ]},
-                        {"$toDouble": "$sellingPrice"},
-                        {
-                            "$let": {
-                                "vars": {
-                                    "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
-                                    "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
-                                    "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
-                                    "mg": {
-                                        "$convert": {
-                                            "input": {
-                                                "$replaceAll": {
-                                                    "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
-                                                    "find": "%",
-                                                    "replacement": ""
-                                                }
-                                            },
-                                            "to": "double",
-                                            "onError": 0,
-                                            "onNull": 0
+                    "$let": {
+                        "vars": {
+                            "bp": {"$toDouble": {"$ifNull": ["$basePrice", 0]}},
+                            "oc": {"$toDouble": {"$ifNull": ["$warehouse_info.overheadCost", 0]}},
+                            "lc": {"$toDouble": {"$ifNull": ["$warehouse_info.logisticCost", 0]}},
+                            "mg": {
+                                "$convert": {
+                                    "input": {
+                                        "$replaceAll": {
+                                            "input": {"$toString": {"$ifNull": ["$product_info.baseMargin", "0"]}},
+                                            "find": "%",
+                                            "replacement": ""
                                         }
-                                    }
-                                },
-                                "in": {
-                                    "$multiply": [
-                                        {"$add": ["$$oc", "$$lc", "$$bp"]},
-                                        {"$add": [1, {"$divide": ["$$mg", 100]}]}
-                                    ]
+                                    },
+                                    "to": "double",
+                                    "onError": 0,
+                                    "onNull": 0
                                 }
                             }
+                        },
+                        "in": {
+                            "$multiply": [
+                                {"$add": ["$$oc", "$$lc", "$$bp"]},
+                                {"$add": [1, {"$divide": ["$$mg", 100]}]}
+                            ]
                         }
-                    ]
+                    }
                 }
             }
         },
@@ -302,34 +284,7 @@ async def create_warehouse_product(product_in: WarehouseProductCreate) -> dict:
 
 async def update_warehouse_product(product_id: str, product_in: WarehouseProductUpdate) -> Optional[dict]:
     db = get_db()
-    wp = await db["warehouse_products"].find_one({"_id": ObjectId(product_id)})
-    if not wp:
-        return None
-
     update_data = product_in.model_dump(exclude_unset=True)
-
-    # Sync linked product details if provided
-    product_fields = {}
-    if "productName" in update_data and update_data["productName"]:
-        product_fields["name"] = update_data["productName"]
-    if "category" in update_data and update_data["category"]:
-        product_fields["category"] = update_data["category"]
-    if "subcategory" in update_data and update_data["subcategory"]:
-        product_fields["subcategory"] = update_data["subcategory"]
-    if "unit" in update_data and update_data["unit"]:
-        product_fields["baseUnit"] = update_data["unit"]
-    if "imageUrl" in update_data and update_data["imageUrl"]:
-        product_fields["imageUrl"] = update_data["imageUrl"]
-
-    if product_fields and wp.get("productId"):
-        try:
-            await db["products"].update_one(
-                {"_id": ObjectId(wp["productId"])},
-                {"$set": product_fields}
-            )
-        except Exception:
-            pass
-
     if update_data:
         await db["warehouse_products"].update_one(
             {"_id": ObjectId(product_id)},
